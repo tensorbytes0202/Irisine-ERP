@@ -1,0 +1,103 @@
+- generic [ref=f3e2]:
+  - banner [ref=f3e3]:
+    - generic [ref=f3e5]:
+      - link "Irisine Classrooms" [ref=f3e6] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=f3e9]:
+        - link "Features" [ref=f3e10] [cursor=pointer]:
+          - /url: /features
+        - link "Pricing" [ref=f3e11] [cursor=pointer]:
+          - /url: /pricing
+        - link "About" [ref=f3e12] [cursor=pointer]:
+          - /url: /#about
+      - link "Sign In" [ref=f3e14] [cursor=pointer]:
+        - /url: /login
+  - main [ref=f3e15]:
+    - generic [ref=f3e16]:
+      - generic [ref=f3e18]:
+        - generic [ref=f3e19]: School management + learning platform
+        - heading "Smart classrooms, simple school management" [level=1] [ref=f3e20]:
+          - text: Smart classrooms,
+          - generic [ref=f3e21]: simple school management
+        - paragraph [ref=f3e22]: Irisine Classrooms brings attendance, assignments, live classes, fees and report cards together, so teachers spend less time on paperwork and more time teaching.
+        - generic [ref=f3e23]:
+          - link "Sign In" [ref=f3e24] [cursor=pointer]:
+            - /url: /login
+          - link "See features" [ref=f3e27] [cursor=pointer]:
+            - /url: /features
+      - generic [ref=f3e29]:
+        - generic [ref=f3e30]:
+          - heading "Everything a classroom needs" [level=2] [ref=f3e31]
+          - paragraph [ref=f3e32]: A focused set of tools for running a school or coaching institute day to day.
+        - generic [ref=f3e33]:
+          - generic [ref=f3e34]:
+            - heading "Attendance" [level=3] [ref=f3e40]
+            - paragraph [ref=f3e41]: Mark class attendance in a few clicks and see who is present, absent or on leave.
+          - generic [ref=f3e42]:
+            - heading "Timetable & Exam Schedule" [level=3] [ref=f3e46]
+            - paragraph [ref=f3e47]: Plan weekly timetables and exam dates so teachers and students always know what is next.
+          - generic [ref=f3e48]:
+            - heading "Assignments & Assessments" [level=3] [ref=f3e55]
+            - paragraph [ref=f3e56]: Create homework and tests, collect submissions and grade them in one place.
+          - generic [ref=f3e57]:
+            - heading "LMS & Live Classes" [level=3] [ref=f3e62]
+            - paragraph [ref=f3e63]: Share notes and course modules, and schedule live classes with learning paths and discussions.
+          - generic [ref=f3e64]:
+            - heading "Grading & Report Cards" [level=3] [ref=f3e69]
+            - paragraph [ref=f3e70]: Record marks and generate report cards without spreadsheets.
+          - generic [ref=f3e71]:
+            - heading "Fees" [level=3] [ref=f3e76]
+            - paragraph [ref=f3e77]: Define fee heads, record payments and keep track of pending dues.
+          - generic [ref=f3e78]:
+            - heading "Announcements & Diary" [level=3] [ref=f3e82]
+            - paragraph [ref=f3e83]: Send announcements and daily diary notes to parents and students.
+          - generic [ref=f3e84]:
+            - heading "Admission & Students" [level=3] [ref=f3e89]
+            - paragraph [ref=f3e90]: Handle enquiries, admissions and student records together.
+      - generic [ref=f3e92]:
+        - generic [ref=f3e93]:
+          - heading "Built for everyone in the school" [level=2] [ref=f3e94]
+          - paragraph [ref=f3e95]: Each person logs in and sees only what they need.
+        - generic [ref=f3e96]:
+          - generic [ref=f3e97]:
+            - heading "School admin" [level=3] [ref=f3e102]
+            - paragraph [ref=f3e103]: "See the whole school on one dashboard: students, attendance and fees."
+          - generic [ref=f3e104]:
+            - heading "Teachers" [level=3] [ref=f3e111]
+            - paragraph [ref=f3e112]: Take attendance, set assignments and grade work from their own view.
+          - generic [ref=f3e113]:
+            - heading "Students" [level=3] [ref=f3e118]
+            - paragraph [ref=f3e119]: Check timetable, assignments, notes and live classes.
+          - generic [ref=f3e120]:
+            - heading "Parents" [level=3] [ref=f3e125]
+            - paragraph [ref=f3e126]: Follow attendance, results, fees and school announcements.
+      - generic [ref=f3e129]:
+        - heading "Ready to try Irisine Classrooms?" [level=2] [ref=f3e130]
+        - paragraph [ref=f3e131]: Sign in to explore the demo school.
+        - link "Sign In" [ref=f3e132] [cursor=pointer]:
+          - /url: /login
+  - contentinfo [ref=f3e135]:
+    - generic [ref=f3e136]:
+      - generic [ref=f3e137]:
+        - generic [ref=f3e138]:
+          - generic [ref=f3e139]: Irisine Classrooms
+          - paragraph [ref=f3e141]: Irisine Classrooms is a school management and learning platform for students, teachers, parents and administrators.
+        - generic [ref=f3e142]:
+          - heading "Explore" [level=4] [ref=f3e143]
+          - list [ref=f3e144]:
+            - listitem [ref=f3e145]:
+              - link "Features" [ref=f3e146] [cursor=pointer]:
+                - /url: /features
+            - listitem [ref=f3e147]:
+              - link "Pricing" [ref=f3e148] [cursor=pointer]:
+                - /url: /pricing
+            - listitem [ref=f3e149]:
+              - link "Sign In" [ref=f3e150] [cursor=pointer]:
+                - /url: /login
+            - listitem [ref=f3e151]: support@irisine.demo
+      - generic [ref=f3e155]:
+        - paragraph [ref=f3e156]:
+          - text: © 2026 Irisine Classrooms. Irisine Classrooms is based on Globussoft Open School MIS (AGPL-3.0).
+          - link "Original source" [ref=f3e157] [cursor=pointer]:
+            - /url: https://github.com/Globussoft-Technologies/globussoft-school-mis
+        - paragraph [ref=f3e158]: This software is licensed under the GNU AGPL-3.0. If you run a modified version for others, you must offer them its source code.

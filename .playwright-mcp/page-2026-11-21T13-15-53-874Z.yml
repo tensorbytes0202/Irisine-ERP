@@ -1,0 +1,143 @@
+- generic [ref=f5e1]:
+  - generic [ref=f5e2]:
+    - complementary [ref=f5e6]:
+      - button "Close menu" [ref=f5e7] [cursor=pointer]
+      - link "Irisine Classrooms" [ref=f5e12] [cursor=pointer]:
+        - /url: /dashboard
+      - navigation [ref=f5e15]:
+        - generic [ref=f5e16]:
+          - button "Home" [expanded] [ref=f5e17] [cursor=pointer]
+          - generic [ref=f5e20]:
+            - link "Dashboard" [ref=f5e21] [cursor=pointer]:
+              - /url: /dashboard
+            - link "Announcements" [ref=f5e28] [cursor=pointer]:
+              - /url: /announcements
+            - link "Calendar" [ref=f5e33] [cursor=pointer]:
+              - /url: /calendar
+            - link "Notifications" [ref=f5e37] [cursor=pointer]:
+              - /url: /notifications
+            - link "Events" [ref=f5e42] [cursor=pointer]:
+              - /url: /events
+        - button "Students" [ref=f5e51] [cursor=pointer]
+        - button "Academics" [ref=f5e55] [cursor=pointer]
+        - button "Learning (LMS)" [ref=f5e59] [cursor=pointer]
+        - button "Finance" [ref=f5e63] [cursor=pointer]
+        - button "Staff" [ref=f5e67] [cursor=pointer]
+        - button "Communication" [ref=f5e71] [cursor=pointer]
+        - button "Settings" [ref=f5e75] [cursor=pointer]
+      - button "Sign Out" [ref=f5e79] [cursor=pointer]
+    - generic [ref=f5e83]:
+      - banner [ref=f5e84]:
+        - button "Open menu" [active] [ref=f5e85] [cursor=pointer]
+        - textbox "Search students, users..." [ref=f5e89]
+        - generic [ref=f5e90]:
+          - button "Switch to light mode" [ref=f5e91] [cursor=pointer]
+          - generic [ref=f5e98]: SA
+      - main [ref=f5e100]:
+        - generic [ref=f5e102]:
+          - heading "Dashboard" [level=1] [ref=f5e103]
+          - generic [ref=f5e105]:
+            - link [ref=f5e106] [cursor=pointer]:
+              - /url: /students
+              - generic [ref=f5e112]:
+                - paragraph [ref=f5e113]: Total Students
+                - generic [ref=f5e114]:
+                  - paragraph [ref=f5e115]: "80"
+                  - generic [ref=f5e116]: "80"
+            - link [ref=f5e120] [cursor=pointer]:
+              - /url: /staff-directory
+              - generic [ref=f5e128]:
+                - paragraph [ref=f5e129]: Total Teachers
+                - paragraph [ref=f5e131]: "12"
+            - generic [ref=f5e138]:
+              - paragraph [ref=f5e139]: Today's Attendance
+              - paragraph [ref=f5e140]: 0%
+            - link [ref=f5e142] [cursor=pointer]:
+              - /url: /fees
+              - generic [ref=f5e147]:
+                - paragraph [ref=f5e148]: Fee Collection (Month)
+                - paragraph [ref=f5e150]: ₹0
+          - generic [ref=f5e151]:
+            - generic [ref=f5e152]:
+              - heading "Attendance Trend (Last 7 Days)" [level=2] [ref=f5e153]
+              - generic [ref=f5e154]:
+                - generic [ref=f5e155]:
+                  - generic [ref=f5e156]: 85%
+                  - generic [ref=f5e159]: Sun
+                - generic [ref=f5e160]:
+                  - generic [ref=f5e161]: 85%
+                  - generic [ref=f5e164]: Mon
+                - generic [ref=f5e165]:
+                  - generic [ref=f5e166]: 87%
+                  - generic [ref=f5e169]: Tue
+                - generic [ref=f5e170]:
+                  - generic [ref=f5e171]: 90%
+                  - generic [ref=f5e174]: Wed
+                - generic [ref=f5e175]:
+                  - generic [ref=f5e176]: 88%
+                  - generic [ref=f5e179]: Thu
+                - generic [ref=f5e180]:
+                  - generic [ref=f5e181]: 80%
+                  - generic [ref=f5e184]: Fri
+                - generic [ref=f5e185]:
+                  - generic [ref=f5e186]: 0%
+                  - generic [ref=f5e189]: Sat
+            - generic [ref=f5e190]:
+              - heading "Fee Collection Summary" [level=2] [ref=f5e191]
+              - generic [ref=f5e192]:
+                - generic [ref=f5e193]:
+                  - generic [ref=f5e199]:
+                    - paragraph [ref=f5e200]: Collected
+                    - paragraph [ref=f5e201]: ₹0
+                  - generic [ref=f5e206]:
+                    - paragraph [ref=f5e207]: Pending
+                    - paragraph [ref=f5e208]: ₹0
+                - generic [ref=f5e210]:
+                  - generic [ref=f5e211]: Collection Ratio
+                  - generic [ref=f5e212]: 0%
+                - generic [ref=f5e214]: 0 active defaulters
+          - generic [ref=f5e218]:
+            - heading "Quick Stats" [level=2] [ref=f5e219]
+            - generic [ref=f5e220]:
+              - link [ref=f5e221] [cursor=pointer]:
+                - /url: /classes
+                - generic [ref=f5e229]:
+                  - paragraph [ref=f5e230]: Classes
+                  - paragraph [ref=f5e232]: "12"
+              - link [ref=f5e233] [cursor=pointer]:
+                - /url: /classes
+                - generic [ref=f5e239]:
+                  - paragraph [ref=f5e240]: Sections
+                  - paragraph [ref=f5e242]: "24"
+              - link [ref=f5e243] [cursor=pointer]:
+                - /url: /syllabus
+                - generic [ref=f5e249]:
+                  - paragraph [ref=f5e250]: Subjects
+                  - paragraph [ref=f5e252]: "76"
+              - link [ref=f5e253] [cursor=pointer]:
+                - /url: /events
+                - generic [ref=f5e258]:
+                  - paragraph [ref=f5e259]: Upcoming Events
+                  - paragraph [ref=f5e261]: "0"
+          - group [ref=f5e262]:
+            - generic "Detailed Module Stats" [ref=f5e263] [cursor=pointer]
+          - generic [ref=f5e264]:
+            - heading "Quick Actions" [level=2] [ref=f5e265]
+            - generic [ref=f5e266]:
+              - link "Mark Attendance" [ref=f5e267] [cursor=pointer]:
+                - /url: /attendance
+              - link "Add Student" [ref=f5e274] [cursor=pointer]:
+                - /url: /students?action=add
+              - link "New Enquiry" [ref=f5e280] [cursor=pointer]:
+                - /url: /admission
+              - link "Record Payment" [ref=f5e287] [cursor=pointer]:
+                - /url: /fees
+              - link "Create Assessment" [ref=f5e292] [cursor=pointer]:
+                - /url: /assessments
+              - link "Upload Content" [ref=f5e300] [cursor=pointer]:
+                - /url: /lms
+          - generic [ref=f5e306]:
+            - heading "Recent Activity" [level=2] [ref=f5e310]
+            - generic [ref=f5e311]: No recent activity.
+        - generic [ref=f5e313]: Irisine Classrooms is based on Globussoft Open School MIS (AGPL-3.0).
+  - alert [ref=f5e3]
