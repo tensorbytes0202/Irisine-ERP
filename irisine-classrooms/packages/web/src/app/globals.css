@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  THEME: "Iris Purple"
+  Har color ek "dabba" (CSS variable) hai: H S% L% (hue, saturation, lightness).
+  Color badalna ho to sirf yahin badlo, poori app ka rang badal jayega.
+*/
+@layer base {
+  :root {
+    --background: 270 33% 98%;          /* warm white */
+    --foreground: 262 40% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 262 40% 10%;
+    --primary: 263 70% 50%;             /* #6D28D9 Iris Purple */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 40% 95%;
+    --secondary-foreground: 262 40% 20%;
+    --muted: 270 30% 95%;
+    --muted-foreground: 262 12% 42%;
+    --accent: 270 85% 95%;              /* soft lavender */
+    --accent-foreground: 263 70% 38%;
+    --destructive: 0 78% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 266 25% 90%;
+    --input: 266 25% 88%;
+    --ring: 263 70% 50%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 262 35% 7%;
+    --foreground: 270 30% 96%;
+    --card: 262 30% 10%;
+    --card-foreground: 270 30% 96%;
+    --primary: 263 80% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 262 25% 16%;
+    --secondary-foreground: 270 30% 96%;
+    --muted: 262 25% 15%;
+    --muted-foreground: 266 15% 66%;
+    --accent: 263 40% 20%;
+    --accent-foreground: 270 85% 85%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 262 22% 20%;
+    --input: 262 22% 22%;
+    --ring: 263 80% 62%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  /* Form fields theme ke saath badlen (dark mode mein safed na dikhen) */
+  input,
+  select,
+  textarea {
+    @apply bg-background text-foreground;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+}
