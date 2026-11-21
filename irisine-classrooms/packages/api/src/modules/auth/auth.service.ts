@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  ForbiddenException,
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -33,6 +35,47 @@ export class AuthService {
     if (!passwordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    return this.generateTokens(user);
+  }
+
+  /**
+   * Sign up: creates a new school and its first admin (SUPER_ADMIN),
+   * then logs the admin in. Disabled unless ALLOW_SIGNUP=true (fail closed).
+   */
+  async register(dto: RegisterDto) {
+    if (this.config.get<string>('ALLOW_SIGNUP')?.toLowerCase() !== 'true') {
+      throw new ForbiddenException('Sign up is disabled');
+    }
+
+    const email = dto.email.trim().toLowerCase();
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new ConflictException('An account with this email already exists');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const slug = dto.schoolName
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '')
+      .slice(0, 8) || 'SCHOOL';
+    const code = `${slug}-${randomUUID().slice(0, 6).toUpperCase()}`;
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const school = await tx.school.create({
+        data: { name: dto.schoolName.trim(), code, email },
+      });
+      return tx.user.create({
+        data: {
+          email,
+          passwordHash,
+          firstName: dto.firstName.trim(),
+          lastName: dto.lastName.trim(),
+          role: 'SUPER_ADMIN',
+          schoolId: school.id,
+        },
+      });
+    });
 
     return this.generateTokens(user);
   }

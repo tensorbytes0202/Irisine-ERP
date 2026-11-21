@@ -8,8 +8,8 @@ import { AuthShell } from '@/components/auth-shell';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState<string>(brand.demoAdminEmail);
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -98,6 +98,13 @@ export default function LoginPage() {
               Forgot Password?
             </Link>
           </div>
+
+          <p className="text-center text-sm text-muted-foreground">
+            New here?{' '}
+            <Link href="/signup" className="text-primary hover:underline">
+              Create an account
+            </Link>
+          </p>
         </form>
       </div>
     </AuthShell>

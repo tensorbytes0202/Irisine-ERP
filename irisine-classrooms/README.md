@@ -70,13 +70,16 @@ npm run docker:up    # Starts MySQL 8, Redis 7, MinIO
 ```bash
 cd packages/api
 npx prisma db push
-npx ts-node prisma/seed.ts
-npx ts-node prisma/seed-data.ts
-npx ts-node prisma/seed-comprehensive.ts
-npx ts-node prisma/seed-new-modules.ts
-npx ts-node prisma/seed-more.ts
-npx ts-node prisma/seed-final.ts
 ```
+
+Then either open http://localhost:3000/signup and create your school and admin account,
+or seed a starter school (set `ADMIN_SEED_PASSWORD` first, run it only once):
+
+```bash
+ADMIN_SEED_PASSWORD='choose-a-password' npx ts-node prisma/seed.ts
+```
+
+Public sign up is off by default. Set `ALLOW_SIGNUP=true` in `.env` to enable `/signup` (do this only for trusted or local use).
 
 ### 4. Run the Application
 
@@ -109,13 +112,15 @@ Run it on your machine (web on port 3000, API on port 4000):
 | **Landing Page** | http://localhost:3000 |
 | **Features** | http://localhost:3000/features |
 | **Pricing** | http://localhost:3000/pricing |
+| **Sign Up** | http://localhost:3000/signup |
 | **Login** | http://localhost:3000/login |
 | **API Docs (Swagger)** | http://localhost:4000/api/docs |
 
-### Demo Credentials
+### First login
 
-| Role | Email | Password | Access |
-|---|---|---|---|
+The database starts empty. Open http://localhost:3000/signup to create your school and admin account, then sign in at `/login`.
+
+---|---|---|---|
 | **Admin/Principal** | `admin@irisine.demo` | `admin123` | Full access — 82 menu items |
 | **Teacher** | `teacher@irisine.demo` | `teacher123` | 27 menu items — attendance, grading, teaching tracker |
 | **Student** | `aarav.singh.10a@student.irisine.demo` | `student123` | 15 menu items — timetable, assignments, gamification |
@@ -138,8 +143,8 @@ irisine-classrooms/
 │       └── src/app/
 │           ├── (marketing)/ # Landing page, features, pricing
 │           ├── login/       # Authentication
+│           ├── signup/      # Create a school + admin account
 │           └── (dashboard)/ # Role-based dashboard (82 nav items)
-├── e2e-api-tests.js         # 516 E2E API tests (100% coverage)
 ├── docker-compose.yml       # MySQL 8 + Redis 7 + MinIO
 ├── turbo.json               # Turborepo config
 └── package.json             # Root workspace config
@@ -264,25 +269,13 @@ irisine-classrooms/
 
 ## Testing
 
-### E2E API Tests (516 tests — 100% pass rate)
+### E2E tests
 
-```bash
-# Run comprehensive E2E tests against the live API
-node e2e-api-tests.js
-```
-
-The E2E test suite covers **all 350+ API endpoints** across 60+ modules including:
-- Auth (login, logout, refresh, password reset)
-- All CRUD operations (GET, POST, PATCH, DELETE)
-- Workflow transitions (publish, approve, reject, etc.)
-- Role-based access control validation
-- Error handling for missing fields and non-existent resources
-
-### Unit Tests
+The Jest end-to-end specs live in `packages/api/test`:
 
 ```bash
 cd packages/api
-npx jest --config test/jest-e2e.json --runInBand
+npm run test:e2e
 ```
 
 ---

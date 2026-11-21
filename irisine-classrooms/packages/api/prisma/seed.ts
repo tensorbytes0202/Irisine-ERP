@@ -29,7 +29,13 @@ async function main() {
   });
 
   // Create super admin
-  const passwordHash = await bcrypt.hash('admin123', 10);
+  const adminPassword = process.env.ADMIN_SEED_PASSWORD;
+
+  if (!adminPassword) {
+    throw new Error('ADMIN_SEED_PASSWORD environment variable is required');
+  }
+
+  const passwordHash = await bcrypt.hash(adminPassword, 10);
   await prisma.user.create({
     data: {
       email: 'admin@irisine.demo',
