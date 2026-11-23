@@ -695,7 +695,7 @@ export default function DashboardLayout({
         <main className="flex-1 overflow-auto">
           <div className="p-4 sm:p-6 lg:p-8">{children}</div>
           <footer className="px-4 sm:px-6 lg:px-8 pb-6 text-xs text-muted-foreground">
-            {brand.licenseNotice}
+            &copy; {brand.copyrightYear} {brand.name}
           </footer>
         </main>
       </div>

@@ -127,16 +127,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="mt-10 pt-6 border-t text-xs text-muted-foreground space-y-1">
-            <p>
-              &copy; {brand.copyrightYear} {brand.name}.{' '}
-              {brand.licenseNotice}{' '}
-              <a href={brand.sourceUrl} className="underline hover:text-primary" target="_blank" rel="noreferrer">
-                Original source
-              </a>
-            </p>
-            <p>
-              This software is licensed under the GNU AGPL-3.0. If you run a modified version for others, you must offer them its source code.
-            </p>
+            <p>&copy; {brand.copyrightYear} {brand.name}. All rights reserved.</p>
           </div>
         </div>
       </footer>

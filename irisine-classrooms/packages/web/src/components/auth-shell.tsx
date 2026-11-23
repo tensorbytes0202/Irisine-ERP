@@ -32,7 +32,9 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             ))}
           </ul>
         </div>
-        <p className="relative text-xs text-white/60">{brand.licenseNotice}</p>
+        <p className="relative text-xs text-white/60">
+          &copy; {brand.copyrightYear} {brand.name}
+        </p>
       </aside>
 
       {/* Right: form */}

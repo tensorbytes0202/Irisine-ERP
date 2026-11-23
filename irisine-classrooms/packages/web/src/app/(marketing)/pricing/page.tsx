@@ -42,8 +42,8 @@ const faqs = [
     a: 'Yes. Extra modules such as hostel, transport or payroll are built in but hidden by default and can be turned on by the administrator of your deployment.',
   },
   {
-    q: 'Who owns the code?',
-    a: `${brand.name} is based on Globussoft Open School MIS and is licensed under the GNU AGPL-3.0, so the source stays open.`,
+    q: 'Is the source code open?',
+    a: `Yes. ${brand.name} is open source under the GNU AGPL-3.0, so you can run and adapt it for your school.`,
   },
 ];
 

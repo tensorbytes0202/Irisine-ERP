@@ -3,56 +3,61 @@
 @tailwind utilities;
 
 /*
-  THEME: "Iris Purple"
+  THEME: "Emerald Green"
   Har color ek "dabba" (CSS variable) hai: H S% L% (hue, saturation, lightness).
   Color badalna ho to sirf yahin badlo, poori app ka rang badal jayega.
 */
 @layer base {
   :root {
-    --background: 270 33% 98%;          /* warm white */
-    --foreground: 262 40% 10%;
+    --background: 120 14% 97%;          /* #F8FAF8 off-white */
+    --foreground: 160 30% 8%;
     --card: 0 0% 100%;
-    --card-foreground: 262 40% 10%;
-    --primary: 263 70% 50%;             /* #6D28D9 Iris Purple */
+    --card-foreground: 160 30% 8%;
+    --primary: 162 88% 20%;             /* #065F46 Deep Emerald */
     --primary-foreground: 0 0% 100%;
-    --secondary: 270 40% 95%;
-    --secondary-foreground: 262 40% 20%;
-    --muted: 270 30% 95%;
-    --muted-foreground: 262 12% 42%;
-    --accent: 270 85% 95%;              /* soft lavender */
-    --accent-foreground: 263 70% 38%;
+    --secondary: 140 30% 94%;
+    --secondary-foreground: 162 40% 15%;
+    --muted: 140 18% 94%;
+    --muted-foreground: 160 10% 38%;
+    --accent: 142 55% 92%;              /* soft mint */
+    --accent-foreground: 162 88% 18%;
     --destructive: 0 78% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 266 25% 90%;
-    --input: 266 25% 88%;
-    --ring: 263 70% 50%;
+    --border: 140 15% 88%;
+    --input: 140 15% 86%;
+    --ring: 142 76% 36%;                /* #16A34A Fresh Green */
+    --fresh: 142 76% 36%;
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 262 35% 7%;
-    --foreground: 270 30% 96%;
-    --card: 262 30% 10%;
-    --card-foreground: 270 30% 96%;
-    --primary: 263 80% 62%;
+    --background: 165 30% 6%;
+    --foreground: 140 20% 96%;
+    --card: 165 25% 9%;
+    --card-foreground: 140 20% 96%;
+    --primary: 142 70% 33%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 262 25% 16%;
-    --secondary-foreground: 270 30% 96%;
-    --muted: 262 25% 15%;
-    --muted-foreground: 266 15% 66%;
-    --accent: 263 40% 20%;
-    --accent-foreground: 270 85% 85%;
+    --secondary: 165 20% 14%;
+    --secondary-foreground: 140 20% 96%;
+    --muted: 165 18% 13%;
+    --muted-foreground: 150 10% 65%;
+    --accent: 160 40% 16%;
+    --accent-foreground: 142 60% 80%;
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 262 22% 20%;
-    --input: 262 22% 22%;
-    --ring: 263 80% 62%;
+    --border: 165 18% 18%;
+    --input: 165 18% 20%;
+    --ring: 142 70% 40%;
+    --fresh: 142 70% 45%;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground antialiased;
@@ -65,5 +70,50 @@
   }
   .dark {
     color-scheme: dark;
+  }
+}
+
+/* Landing page ke halke animations */
+@layer utilities {
+  .fade-up {
+    animation: fade-up 0.7s ease-out both;
+  }
+  .float-slow {
+    animation: float-slow 6s ease-in-out infinite;
+  }
+  .float-slower {
+    animation: float-slow 8s ease-in-out infinite reverse;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .fade-up,
+  .float-slow,
+  .float-slower {
+    animation: none;
   }
 }

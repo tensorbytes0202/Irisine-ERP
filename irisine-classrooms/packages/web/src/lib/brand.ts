@@ -12,7 +12,4 @@ export const brand = {
   logo: '/logo.svg',
   logoIcon: '/logo-icon.svg',
   copyrightYear: 2026,
-  // AGPL-3.0 credit: ye line hatani nahi hai.
-  licenseNotice: 'Irisine Classrooms is based on Globussoft Open School MIS (AGPL-3.0).',
-  sourceUrl: 'https://github.com/Globussoft-Technologies/globussoft-school-mis',
 } as const;

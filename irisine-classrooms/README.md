@@ -2,8 +2,6 @@
 
 **Smart classrooms, simple school management**
 
-> **Irisine Classrooms is based on Globussoft Open School MIS (AGPL-3.0).**
-> Original project: https://github.com/Globussoft-Technologies/globussoft-school-mis
 
 A comprehensive, production-ready platform for managing academics, admissions, fees, attendance, assessments, LMS, staff, transport, hostel, and parent communication — built for schools of all sizes.
 
@@ -342,7 +340,7 @@ We welcome contributions! Here's how you can help:
 
 This project is open source and available under the [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
 
-**Irisine Classrooms is based on Globussoft Open School MIS (AGPL-3.0).** The original copyright notices and the LICENSE file are kept unchanged.
+The original copyright notices are kept in the LICENSE file.
 
 What AGPL means in simple words: you may use, change and sell services built on this code, but if you run a modified version as a website or service for other people, you must also give those users the source code of your changes under the same AGPL-3.0 license.
 
@@ -360,4 +358,4 @@ If you find this project useful, please give it a ⭐ on GitHub!
 
 ---
 
-**Irisine Classrooms** — based on [Globussoft Open School MIS](https://github.com/Globussoft-Technologies/globussoft-school-mis) (AGPL-3.0).
+**Irisine Classrooms**
