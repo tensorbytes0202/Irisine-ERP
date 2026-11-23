@@ -17,6 +17,7 @@ import { GradingModule } from './modules/grading/grading.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 // Phase 3
 import { FeesModule } from './modules/fees/fees.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { DisciplineModule } from './modules/discipline/discipline.module';
 import { BusModule } from './modules/bus/bus.module';
 // Phase 4
@@ -127,6 +128,7 @@ import { AuditModule } from './modules/audit/audit.module';
     AnalyticsModule,
     // Phase 3
     FeesModule,
+    PaymentsModule,
     DisciplineModule,
     BusModule,
     // Phase 4

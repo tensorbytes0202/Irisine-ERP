@@ -117,3 +117,11 @@
     animation: none;
   }
 }
+
+/* Receipt: print only the receipt card (hides sidebar / top bar) */
+@media print {
+  aside,
+  header {
+    display: none !important;
+  }
+}

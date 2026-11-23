@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { brand } from '@/lib/brand';
 import { AuthShell } from '@/components/auth-shell';
+import { OtpForm } from '@/components/otp-form';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [needsVerify, setNeedsVerify] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,6 +27,13 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
+      if (res.status === 403) {
+        const body = await res.json().catch(() => ({}));
+        if (body.code === 'EMAIL_NOT_VERIFIED') {
+          setNeedsVerify(true);
+          return;
+        }
+      }
       if (!res.ok) {
         throw new Error('Invalid credentials');
       }
@@ -39,6 +48,26 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function finish(data: any) {
+    localStorage.setItem('accessToken', data.accessToken);
+    localStorage.setItem('refreshToken', data.refreshToken);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    router.push('/dashboard');
+  }
+
+  if (needsVerify) {
+    return (
+      <AuthShell>
+        <div className="w-full">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tight">Verify your email</h1>
+          </div>
+          <OtpForm email={email} purpose="SIGNUP" onVerified={finish} onBack={() => setNeedsVerify(false)} />
+        </div>
+      </AuthShell>
+    );
   }
 
   return (

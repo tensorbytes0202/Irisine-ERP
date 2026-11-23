@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { brand } from '@/lib/brand';
 import { AuthShell } from '@/components/auth-shell';
+import { OtpForm } from '@/components/otp-form';
 
 const inputClass = 'w-full px-3 py-2 border rounded-md bg-background';
 
@@ -20,6 +21,7 @@ export default function SignupPage() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -57,15 +59,32 @@ export default function SignupPage() {
         throw new Error(msg || 'Could not create account');
       }
 
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      router.push('/dashboard');
+      setVerifying(true); // account is created, now confirm the email
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create account');
     } finally {
       setLoading(false);
     }
+  }
+
+  function finish(data: any) {
+    localStorage.setItem('accessToken', data.accessToken);
+    localStorage.setItem('refreshToken', data.refreshToken);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    router.push('/dashboard');
+  }
+
+  if (verifying) {
+    return (
+      <AuthShell>
+        <div className="w-full">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tight">Verify your email</h1>
+          </div>
+          <OtpForm email={form.email} purpose="SIGNUP" onVerified={finish} onBack={() => setVerifying(false)} />
+        </div>
+      </AuthShell>
+    );
   }
 
   return (

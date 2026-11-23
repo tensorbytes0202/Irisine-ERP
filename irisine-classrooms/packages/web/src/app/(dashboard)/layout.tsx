@@ -20,6 +20,7 @@ import {
   BarChart3,
   LogOut,
   CreditCard,
+  IndianRupee,
   Shield,
   Bus,
   Palette,
@@ -106,6 +107,8 @@ const allNavigation = [
   { name: 'Users', href: '/users', icon: Users },
   // Phase 3
   { name: 'Fee Management', href: '/fees', icon: CreditCard },
+  { name: 'My Fees', href: '/my-fees', icon: Receipt },
+  { name: 'Online Payments', href: '/online-payments', icon: IndianRupee },
   { name: 'Discipline', href: '/discipline', icon: Shield },
   { name: 'Bus Tracking', href: '/bus', icon: Bus },
   // Phase 4
@@ -190,7 +193,7 @@ const allNavigation = [
 // SUPER_ADMIN and IT_ADMIN see everything (handled below).
 const roleNavMap: Record<string, string[]> = {
   DIRECTOR: [
-    'Dashboard', 'Analytics', 'Report Cards', 'Compliance', 'Fee Management',
+    'Dashboard', 'Analytics', 'Report Cards', 'Compliance', 'Fee Management', 'Online Payments',
     'Discipline', 'Users', 'Reports', 'Calendar', 'Promotions', 'Concessions', 'Announcements',
     'Result Workflow', 'Grace Marks', 'Transfer Certificates', 'Library', 'Visitors',
     'Feedback', 'Certificates', 'Hostel', 'Payroll', 'Grievances', 'Events',
@@ -228,11 +231,11 @@ const roleNavMap: Record<string, string[]> = {
     'Course Modules', 'Discussions', 'Gamification',
     'Teaching Tracker',
   ],
-  ACCOUNTANT: ['Dashboard', 'Fee Management', 'Fee Automation', 'Reports', 'Concessions', 'Payroll', 'Hostel', 'Expenses'],
+  ACCOUNTANT: ['Dashboard', 'Fee Management', 'Online Payments', 'Fee Automation', 'Reports', 'Concessions', 'Payroll', 'Hostel', 'Expenses'],
   TRANSPORT_MANAGER: ['Dashboard', 'Bus Tracking'],
   HOBBY_COORDINATOR: ['Dashboard', 'Hobbies'],
-  PARENT: ['Dashboard', 'Notifications', 'Communication', 'Announcements', 'Feedback', 'Grievances', 'Diary', 'Events'],
-  STUDENT: ['Dashboard', 'Timetable', 'Assignments', 'Homework Calendar', 'Notifications', 'Announcements', 'Feedback', 'Certificates', 'Grievances', 'Diary', 'Events', 'Learning Paths', 'Live Classes', 'Course Modules', 'Discussions', 'Gamification'],
+  PARENT: ['Dashboard', 'My Fees', 'Notifications', 'Communication', 'Announcements', 'Feedback', 'Grievances', 'Diary', 'Events'],
+  STUDENT: ['Dashboard', 'My Fees', 'Timetable', 'Assignments', 'Homework Calendar', 'Notifications', 'Announcements', 'Feedback', 'Certificates', 'Grievances', 'Diary', 'Events', 'Learning Paths', 'Live Classes', 'Course Modules', 'Discussions', 'Gamification'],
 };
 
 const adminRoles = ['SUPER_ADMIN', 'IT_ADMIN'];
@@ -243,7 +246,7 @@ const navGroups: { name: string; items: string[] }[] = [
   { name: 'Students', items: ['Students', 'Admission', 'Attendance', 'Period Attendance', 'Classes & Sections', 'Promotions', 'Documents', 'Transfer Certificates', 'Certificates', 'Discipline', 'Health Records', 'Year Transition'] },
   { name: 'Academics', items: ['Syllabus', 'Timetable', 'Teaching Tracker', 'Assignments', 'Assessments', 'Question Bank', 'Exam Schedule', 'Grading', 'Result Workflow', 'Remedial', 'Grace Marks', 'Report Cards', 'Performance Report', 'Rubrics', 'Speed Grader', 'Analytics', 'Substitutes'] },
   { name: 'Learning (LMS)', items: ['LMS Content', 'File Manager', 'Course Modules', 'Live Classes', 'Learning Paths', 'Discussions', 'Gamification'] },
-  { name: 'Finance', items: ['Fee Management', 'Fee Automation', 'Concessions', 'Expenses', 'Payroll', 'Transport Billing'] },
+  { name: 'Finance', items: ['Fee Management', 'My Fees', 'Online Payments', 'Fee Automation', 'Concessions', 'Expenses', 'Payroll', 'Transport Billing'] },
   { name: 'Staff', items: ['Users', 'Staff Directory', 'Teacher Attendance', 'Leave Requests'] },
   { name: 'Communication', items: ['Communication', 'Diary', 'Feedback', 'Message Logs', 'Surveys', 'Meetings', 'Grievances'] },
   { name: 'Campus', items: ['Hostel', 'Bus Tracking', 'Hobbies', 'Library', 'Inventory', 'Visitors', 'Room Booking', 'ID Cards', 'Alumni', 'Gallery'] },

@@ -11,7 +11,7 @@ export class EmailService {
 
   constructor(private config: ConfigService) {
     this.emailEnabled = this.config.get<string>('EMAIL_ENABLED', 'false') === 'true';
-    this.from = this.config.get<string>('SMTP_FROM', 'noreply@irisine.demo');
+    this.from = this.config.get<string>('EMAIL_FROM') || this.config.get<string>('SMTP_FROM', 'noreply@irisine.demo');
 
     this.transporter = nodemailer.createTransport({
       host: this.config.get<string>('SMTP_HOST', 'smtp.gmail.com'),
@@ -25,10 +25,32 @@ export class EmailService {
   }
 
   async sendEmail(to: string, subject: string, html: string): Promise<void> {
+    // Resend (preferred when RESEND_API_KEY is set)
+    const resendKey = this.config.get<string>('RESEND_API_KEY');
+    if (resendKey) {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: this.from, to: [to], subject, html }),
+      });
+      if (!res.ok) {
+        this.logger.error(`Resend failed (${res.status}) for ${to}`);
+        throw new Error('Email delivery failed');
+      }
+      this.logger.log(`Email sent to ${to} via Resend`);
+      return;
+    }
+
     if (!this.emailEnabled) {
-      this.logger.log(
-        `[EMAIL DISABLED] To: ${to} | Subject: ${subject}\n${html.replace(/<[^>]+>/g, ' ')}`,
-      );
+      // Never print the message body in production (it may contain a one-time code).
+      if (process.env.NODE_ENV === 'production') {
+        this.logger.warn(`[EMAIL DISABLED] To: ${to} | Subject: ${subject}`);
+      } else {
+        this.logger.log(
+          `[EMAIL DISABLED] To: ${to} | Subject: ${subject}
+${html.replace(/<[^>]+>/g, ' ')}`,
+        );
+      }
       return;
     }
 

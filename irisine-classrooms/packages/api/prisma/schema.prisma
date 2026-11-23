@@ -68,6 +68,7 @@ model User {
   role         String   // enum enforced at app level
   avatarUrl    String?
   isActive     Boolean  @default(true)
+  emailVerified Boolean @default(true) // false only for self sign-ups until the email OTP is verified
   schoolId     String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -231,6 +232,7 @@ model Student {
   redFlags          RedFlag[]
   busAssignment     BusAssignment?
   boardingLogs      BoardingLog[]
+  paymentOrders PaymentOrder[]
 
   @@map("students")
 }
@@ -903,6 +905,7 @@ model FeeHead {
   class             Class                 @relation(fields: [classId], references: [id])
   academicSession   AcademicSession       @relation(fields: [academicSessionId], references: [id])
   payments          Payment[]
+  paymentOrders     PaymentOrder[]
   concessions       Concession[]
   defaulterRecords  DefaulterRecord[]
   feeStructureLinks FeeStructureFeeHead[]
@@ -1656,6 +1659,60 @@ model PasswordResetToken {
 
   @@index([email, otp])
   @@map("password_reset_tokens")
+}
+
+// ─── Email OTP (sign-up verification, password reset) ─────────────
+
+model EmailOtp {
+  id        String    @id @default(uuid())
+  email     String
+  purpose   String    // SIGNUP, RESET, RESET_TOKEN
+  codeHash  String    // HMAC of the code, never the code itself
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email, purpose, createdAt])
+  @@map("email_otps")
+}
+
+// ─── Online fee payments (Razorpay) ───────────────────────────────
+
+model PaymentOrder {
+  id                 String    @id @default(uuid())
+  studentId          String
+  feeHeadId          String
+  initiatedBy        String
+  amount             Decimal   @db.Decimal(12, 2)
+  currency           String    @default("INR")
+  status             String    @default("CREATED") // CREATED, PAID, FAILED
+  razorpayOrderId    String    @unique
+  razorpayPaymentId  String?   @unique
+  method             String?
+  failureReason      String?
+  receiptNo          String?   @unique
+  paymentId          String?   // existing Payment row created on success
+  paidAt             DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id])
+  feeHead FeeHead @relation(fields: [feeHeadId], references: [id])
+
+  @@index([studentId])
+  @@index([initiatedBy])
+  @@index([status])
+  @@map("payment_orders")
+}
+
+model PaymentWebhookEvent {
+  id          String   @id @default(uuid())
+  eventId     String   @unique
+  eventType   String
+  processedAt DateTime @default(now())
+
+  @@map("payment_webhook_events")
 }
 
 // ─── Feedback ─────────────────────────────────────────────────────
