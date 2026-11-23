@@ -65,7 +65,7 @@ describe('OTP verification', () => {
     const { svc, lastCode } = build();
     await svc.send('a@test.com', 'SIGNUP');
     const code = lastCode();
-    await expect(svc.consume('a@test.com', 'SIGNUP', code)).resolves.toBeUndefined();
+    await expect(svc.consume('a@test.com', 'SIGNUP', code)).resolves.toBeNull();
     await expect(svc.consume('a@test.com', 'SIGNUP', code)).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -101,7 +101,7 @@ describe('OTP verification', () => {
     await svc.send('a@test.com', 'SIGNUP');
     const second = lastCode();
     expect(rows.filter((r) => !r.usedAt)).toHaveLength(1);
-    await expect(svc.consume('a@test.com', 'SIGNUP', second)).resolves.toBeUndefined();
+    await expect(svc.consume('a@test.com', 'SIGNUP', second)).resolves.toBeNull();
   });
 
   it('keeps purposes separate', async () => {
@@ -131,7 +131,7 @@ describe('password reset token', () => {
   it('is single use', async () => {
     const { svc } = build();
     const token = await svc.issueResetToken('a@test.com');
-    await expect(svc.consume('a@test.com', 'RESET_TOKEN', token)).resolves.toBeUndefined();
+    await expect(svc.consume('a@test.com', 'RESET_TOKEN', token)).resolves.toBeNull();
     await expect(svc.consume('a@test.com', 'RESET_TOKEN', token)).rejects.toBeInstanceOf(BadRequestException);
   });
 });

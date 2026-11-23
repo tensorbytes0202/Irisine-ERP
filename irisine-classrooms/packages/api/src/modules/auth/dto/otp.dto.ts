@@ -18,6 +18,12 @@ export class VerifyOtpDto extends SendOtpDto {
   @Length(6, 6)
   @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
   otp: string;
+
+  @ApiPropertyOptional({ description: 'Required for SIGNUP: the password for the new account' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(72)
+  password?: string;
 }
 
 export class ResetPasswordDto {

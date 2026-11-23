@@ -1671,6 +1671,7 @@ model EmailOtp {
   attempts  Int       @default(0)
   expiresAt DateTime
   usedAt    DateTime?
+  payload   String?   @db.Text // pending sign-up details (no password), SIGNUP only
   createdAt DateTime  @default(now())
 
   @@index([email, purpose, createdAt])

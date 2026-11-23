@@ -59,7 +59,7 @@ export class AuthController {
   @Post('verify-otp')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.authService.verifyOtp(dto.email, dto.otp, dto.purpose ?? 'SIGNUP');
+    return this.authService.verifyOtp(dto.email, dto.otp, dto.purpose ?? 'SIGNUP', dto.password);
   }
 
   @Post('reset-password')

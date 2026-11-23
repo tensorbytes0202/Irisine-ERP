@@ -15,12 +15,14 @@ export function OtpForm({
   onVerified,
   onBack,
   autoSent = true,
+  password,
 }: {
   email: string;
   purpose: 'SIGNUP' | 'RESET';
   onVerified: (data: any) => void;
   onBack?: () => void;
   autoSent?: boolean; // a code was just sent by the previous step
+  password?: string; // SIGNUP only: the password is set when the code is verified
 }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -44,7 +46,7 @@ export function OtpForm({
       const res = await fetch(`${API}/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp: code, purpose }),
+        body: JSON.stringify({ email, otp: code, purpose, ...(purpose === 'SIGNUP' ? { password } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

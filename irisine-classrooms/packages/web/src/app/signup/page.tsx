@@ -81,7 +81,7 @@ export default function SignupPage() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold tracking-tight">Verify your email</h1>
           </div>
-          <OtpForm email={form.email} purpose="SIGNUP" onVerified={finish} onBack={() => setVerifying(false)} />
+          <OtpForm email={form.email} purpose="SIGNUP" password={form.password} onVerified={finish} onBack={() => setVerifying(false)} />
         </div>
       </AuthShell>
     );
