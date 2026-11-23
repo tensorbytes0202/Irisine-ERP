@@ -59,7 +59,8 @@ export default function SignupPage() {
         throw new Error(msg || 'Could not create account');
       }
 
-      setVerifying(true); // account is created, now confirm the email
+      setError(''); // drop any stale form error before the code screen opens
+      setVerifying(true); // details saved, now confirm the email
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create account');
     } finally {
@@ -81,7 +82,7 @@ export default function SignupPage() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold tracking-tight">Verify your email</h1>
           </div>
-          <OtpForm email={form.email} purpose="SIGNUP" password={form.password} onVerified={finish} onBack={() => setVerifying(false)} />
+          <OtpForm email={form.email} purpose="SIGNUP" password={form.password} onVerified={finish} onBack={() => { setError(''); setVerifying(false); }} />
         </div>
       </AuthShell>
     );

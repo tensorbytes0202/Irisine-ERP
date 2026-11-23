@@ -41,6 +41,12 @@ export function OtpForm({
     if (loading) return;
     setError('');
     setInfo('');
+    // Only the 6-digit code is validated here. For sign-up the password was already
+    // validated on the sign-up form and is only carried (in memory) to the API call.
+    if (purpose === 'SIGNUP' && !password) {
+      setError('Your sign-up session was lost (page refreshed). Please go back and fill the form again.');
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`${API}/auth/verify-otp`, {
