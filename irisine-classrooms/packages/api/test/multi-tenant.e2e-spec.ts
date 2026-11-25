@@ -450,4 +450,68 @@ describe('Multi-tenant platform (e2e)', () => {
       expect((await login(email, 'Student-Pass-123', 'STUDENT')).status).toBe(201);
     });
   });
+
+  // ─────────────────────────────────────────────────────────────
+
+  describe('a school runs itself, the owner only looks', () => {
+    const studentEmail = `${RUN}-self-stu@example.com`;
+    const teacherEmail = `${RUN}-self-fac@example.com`;
+    let student: any;
+    const own = () => auth(schools.B.token);
+    const addStudent = (body: object, token = own()) => request(http()).post(`${api}/students`).set(token).send({ ...student, ...body });
+    const people = (id: string, token = platform()) => request(http()).get(`${api}/platform/schools/${id}/people`).set(token);
+
+    it('the school Super Admin sets up a session, class, section, student and teacher alone', async () => {
+      const post = (path: string, body: object) => request(http()).post(`${api}${path}`).set(own()).send(body);
+      const session = await post('/academic-sessions', { name: '2030-31', startDate: '2030-04-01', endDate: '2031-03-31' });
+      expect(session.status).toBe(201);
+      const cls = await post('/classes', { name: 'Class 7', grade: 7 });
+      expect(cls.status).toBe(201);
+      const section = await post('/sections', { name: 'A', classId: cls.body.id });
+      expect(section.status).toBe(201);
+      student = {
+        admissionNo: `${RUN}-SELF-1`, firstName: 'Self', lastName: 'Student', email: studentEmail, gender: 'MALE',
+        dateOfBirth: '2018-02-02', classId: cls.body.id, sectionId: section.body.id, academicSessionId: session.body.id,
+      };
+      expect((await addStudent({})).status).toBe(201);
+      const teacher = await post('/users', {
+        email: teacherEmail, password: 'Teacher-Pass-123', firstName: 'Self', lastName: 'Teacher', role: 'CLASS_TEACHER',
+      });
+      expect(teacher.status).toBe(201);
+      expect((await login(teacherEmail, 'Teacher-Pass-123', 'FACULTY')).status).toBe(201);
+    });
+
+    it('a repeated email or admission number is explained, not a server error', async () => {
+      const sameEmail = await addStudent({ admissionNo: `${RUN}-SELF-2` });
+      expect(sameEmail.status).toBe(409);
+      expect(sameEmail.body.message).toContain('email');
+      const sameNumber = await addStudent({ email: `${RUN}-self-stu2@example.com` });
+      expect(sameNumber.status).toBe(409);
+      expect(sameNumber.body.message).toContain('Admission number');
+      // nothing half-created
+      expect(await prisma.user.count({ where: { email: `${RUN}-self-stu2@example.com` } })).toBe(0);
+    });
+
+    it("the owner sees that school's students and faculty, without secrets", async () => {
+      const res = await people(schools.B.id);
+      expect(res.status).toBe(200);
+      const found = res.body.students.find((s: any) => s.user.email === studentEmail);
+      expect(found).toMatchObject({ admissionNo: `${RUN}-SELF-1`, class: { name: 'Class 7' }, section: { name: 'A' } });
+      expect(res.body.faculty.map((f: any) => f.email)).toContain(teacherEmail);
+      // faculty list holds staff only, never students or admins
+      expect(res.body.faculty.map((f: any) => f.role)).not.toContain('STUDENT');
+      expect(res.body.faculty.map((f: any) => f.role)).not.toContain('SUPER_ADMIN');
+      expect(JSON.stringify(res.body)).not.toMatch(/passwordHash/i);
+      const other = await people(schools.A.id);
+      expect(JSON.stringify(other.body)).not.toContain(studentEmail);
+      expect(JSON.stringify(other.body)).not.toContain(teacherEmail);
+    });
+
+    it('only the owner can use that view', async () => {
+      expect((await people(schools.B.id, own())).status).toBe(403);
+      expect((await people(schools.A.id, own())).status).toBe(403);
+      expect((await request(http()).get(`${api}/platform/schools/${schools.B.id}/people`)).status).toBe(401);
+      expect((await people('00000000-0000-0000-0000-000000000000')).status).toBe(404);
+    });
+  });
 });

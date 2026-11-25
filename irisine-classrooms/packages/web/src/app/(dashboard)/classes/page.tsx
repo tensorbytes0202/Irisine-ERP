@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   ChevronDown, ChevronRight, Plus, Pencil, Trash2, BookOpen, Users, X, Check,
 } from 'lucide-react';
+import { AcademicSessions } from '@/components/academic-sessions';
 
 const base = process.env.NEXT_PUBLIC_API_URL;
 
@@ -196,6 +197,8 @@ export default function ClassesPage() {
           Add Class
         </button>
       </div>
+
+      <AcademicSessions />
 
       {error && (
         <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>

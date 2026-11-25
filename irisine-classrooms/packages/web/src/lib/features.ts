@@ -67,6 +67,7 @@ export const FEATURES: Record<string, boolean> = {
 
   // ───────── Staff ─────────
   users: true,
+  faculty: true,
   'staff-directory': true,
   'teacher-attendance': true,
   leaves: true,

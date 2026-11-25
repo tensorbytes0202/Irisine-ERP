@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Actor, TenantService } from '../platform/tenant.service';
@@ -22,9 +22,17 @@ export class StudentsService {
     await this.tenant.sectionInSchool(dto.sectionId, actor.schoolId, dto.classId);
     await this.tenant.sessionInSchool(dto.academicSessionId, actor.schoolId);
 
+    const email = dto.email.trim().toLowerCase();
+    if (await this.prisma.user.findUnique({ where: { email }, select: { id: true } })) {
+      throw new ConflictException('A user with this email already exists');
+    }
+    // admission numbers are unique across the whole platform (see schema), not just inside one school
+    if (await this.prisma.student.findUnique({ where: { admissionNo: dto.admissionNo }, select: { id: true } })) {
+      throw new ConflictException(`Admission number "${dto.admissionNo}" is already in use. Please use a different one.`);
+    }
+
     // nobody knows this password; the student sets their own through the emailed invite link
     const passwordHash = await bcrypt.hash(InvitesService.unusablePasswordSeed(), 10);
-    const email = dto.email.trim().toLowerCase();
 
     const { student, token } = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({

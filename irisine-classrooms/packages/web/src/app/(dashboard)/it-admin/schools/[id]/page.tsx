@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { CatalogFeature, FeaturePicker, FeatureSelection } from '@/components/feature-picker';
+import { SchoolPeople } from '@/components/school-people';
 
 const input = 'w-full px-3 py-2 border rounded-md bg-background';
 
@@ -140,6 +141,8 @@ export default function SchoolDetailPage() {
         <button onClick={resend} className="text-sm text-primary hover:underline">Send a new set-password link to the Super Admin</button>
         {inviteLink && <div className="rounded-md border bg-muted p-3 text-sm break-all">{inviteLink}</div>}
       </section>
+
+      <SchoolPeople schoolId={id} />
 
       <section className="rounded-lg border bg-card p-4 space-y-3">
         <h2 className="font-semibold">Limits</h2>

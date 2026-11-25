@@ -107,6 +107,7 @@ const allNavigation = [
   { name: 'Report Cards', href: '/report-cards', icon: FileText },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Users', href: '/users', icon: Users },
+  { name: 'Faculty', href: '/faculty', icon: Contact },
   // Phase 3
   { name: 'Fee Management', href: '/fees', icon: CreditCard },
   { name: 'My Fees', href: '/my-fees', icon: Receipt },
@@ -266,7 +267,7 @@ const navGroups: { name: string; items: string[] }[] = [
   { name: 'Academics', items: ['Syllabus', 'Timetable', 'Teaching Tracker', 'Assignments', 'Assessments', 'Question Bank', 'Exam Schedule', 'Grading', 'Result Workflow', 'Remedial', 'Grace Marks', 'Report Cards', 'Performance Report', 'Rubrics', 'Speed Grader', 'Analytics', 'Substitutes'] },
   { name: 'Learning (LMS)', items: ['LMS Content', 'File Manager', 'Course Modules', 'Live Classes', 'Learning Paths', 'Discussions', 'Gamification'] },
   { name: 'Finance', items: ['Fee Management', 'My Fees', 'Online Payments', 'Fee Automation', 'Concessions', 'Expenses', 'Payroll', 'Transport Billing'] },
-  { name: 'Staff', items: ['Users', 'Staff Directory', 'Teacher Attendance', 'Leave Requests'] },
+  { name: 'Staff', items: ['Faculty', 'Users', 'Staff Directory', 'Teacher Attendance', 'Leave Requests'] },
   { name: 'Communication', items: ['Communication', 'Diary', 'Feedback', 'Message Logs', 'Surveys', 'Meetings', 'Grievances'] },
   { name: 'Campus', items: ['Hostel', 'Bus Tracking', 'Hobbies', 'Library', 'Inventory', 'Visitors', 'Room Booking', 'ID Cards', 'Alumni', 'Gallery'] },
   { name: 'Settings', items: ['Settings', 'Reports', 'Bulk Operations', 'Compliance', 'Audit Logs'] },

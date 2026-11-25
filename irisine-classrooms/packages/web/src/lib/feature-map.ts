@@ -8,7 +8,7 @@ const PAGE_FEATURE: Record<string, string> = {
   certificates: 'STUDENT_MANAGEMENT', documents: 'STUDENT_MANAGEMENT', 'id-cards': 'STUDENT_MANAGEMENT',
   alumni: 'STUDENT_MANAGEMENT', 'academic-transition': 'STUDENT_MANAGEMENT', 'parent-portal': 'STUDENT_MANAGEMENT',
   admission: 'ADMISSION',
-  'staff-directory': 'FACULTY_MANAGEMENT', 'teacher-attendance': 'FACULTY_MANAGEMENT', leaves: 'FACULTY_MANAGEMENT',
+  faculty: 'FACULTY_MANAGEMENT', 'staff-directory': 'FACULTY_MANAGEMENT', 'teacher-attendance': 'FACULTY_MANAGEMENT', leaves: 'FACULTY_MANAGEMENT',
   substitutes: 'FACULTY_MANAGEMENT',
   attendance: 'ATTENDANCE', 'period-attendance': 'ATTENDANCE',
   syllabus: 'ACADEMICS', timetable: 'ACADEMICS', assignments: 'ACADEMICS', teaching: 'ACADEMICS', diary: 'ACADEMICS',

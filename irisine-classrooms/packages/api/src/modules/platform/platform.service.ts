@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FeaturesService } from './features.service';
+import { FACULTY_ROLES } from './limits.service';
 
 /** Statuses the owner can set directly. 'DELETED' is only reached through deleteSchool. */
 const SCHOOL_STATUSES = ['ACTIVE', 'SUSPENDED', 'DEACTIVATED'];
@@ -43,6 +44,31 @@ export class PlatformService {
     });
     if (!school) throw new NotFoundException('School not found');
     return { ...school, features: await this.features.listForSchool(id) };
+  }
+
+  /** Read only: what a school has entered itself. No password or token fields are selected. */
+  async people(id: string) {
+    if (!(await this.prisma.school.findUnique({ where: { id }, select: { id: true } }))) {
+      throw new NotFoundException('School not found');
+    }
+    const [students, faculty] = await Promise.all([
+      this.prisma.student.findMany({
+        where: { isActive: true, user: { schoolId: id } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, admissionNo: true, createdAt: true,
+          user: { select: { firstName: true, lastName: true, email: true } },
+          class: { select: { name: true } },
+          section: { select: { name: true } },
+        },
+      }),
+      this.prisma.user.findMany({
+        where: { schoolId: id, role: { in: FACULTY_ROLES } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, firstName: true, lastName: true, email: true, role: true, isActive: true, createdAt: true },
+      }),
+    ]);
+    return { students, faculty };
   }
 
   async setSchoolStatus(id: string, status: string, ownSchoolId: string) {

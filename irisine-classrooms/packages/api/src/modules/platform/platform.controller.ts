@@ -39,6 +39,7 @@ export class PlatformController {
   @Get('schools') listSchools(@Query('status') status?: string) { return this.platform.listSchools(status); }
   @Get('schools/:id') getSchool(@Param('id') id: string) { return this.platform.getSchool(id); }
   @Get('schools/:id/usage') usage(@Param('id') id: string) { return this.limits.usage(id); }
+  @Get('schools/:id/people') people(@Param('id') id: string) { return this.platform.people(id); }
 
   @Patch('schools/:id/status')
   setStatus(@Param('id') id: string, @Body() dto: SetStatusDto, @CurrentUser('schoolId') own: string) {

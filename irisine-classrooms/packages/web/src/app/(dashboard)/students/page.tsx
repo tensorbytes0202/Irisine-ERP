@@ -33,6 +33,8 @@ export default function StudentsPage() {
   const [schoolId, setSchoolId] = useState('');
   const [academicSessionId, setAcademicSessionId] = useState('');
   const [noSession, setNoSession] = useState(false);
+  const [noClasses, setNoClasses] = useState(false);
+  const [noSections, setNoSections] = useState(false);
   const [filterClassId, setFilterClassId] = useState('');
   const [filterSectionId, setFilterSectionId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,7 +54,7 @@ export default function StudentsPage() {
         const r = await fetch('/api/v1/classes', { headers: h });
         if (r.ok) {
           const data = await r.json();
-          if (Array.isArray(data)) setClasses(data);
+          if (Array.isArray(data)) { setClasses(data); setNoClasses(data.length === 0); }
         }
       } catch {}
 
@@ -89,10 +91,12 @@ export default function StudentsPage() {
   }, [filterClassId]);
 
   useEffect(() => {
+    setNoSections(false);
     if (!form.classId) { setFormSections([]); return; }
     const token = getToken();
     fetch(`/api/v1/sections?classId=${form.classId}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : []).then(setFormSections).catch(() => setFormSections([]));
+      .then(r => r.ok ? r.json() : Promise.reject()).then((data: SectionOption[]) => { setFormSections(data); setNoSections(data.length === 0); })
+      .catch(() => setFormSections([]));
   }, [form.classId]);
 
   const fetchStudents = useCallback(async () => {
@@ -151,9 +155,12 @@ export default function StudentsPage() {
       {showForm && (
         <div className="bg-card rounded-lg border p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">New Student</h2>
-          {noSession && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded text-sm">
-              Create an academic session first (School Configuration). Students cannot be added without one.
+          {(noClasses || noSession || noSections) && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded text-sm space-y-1">
+              {noClasses && <p>No classes yet in your school. Add a class and a section first.</p>}
+              {noSession && <p>No academic session yet. Students cannot be added without one.</p>}
+              {noSections && <p>This class has no section yet. Add one first.</p>}
+              <p>Go to <Link href="/classes" className="font-medium underline">Classes &amp; Sections</Link>.</p>
             </div>
           )}
           {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded text-sm">{error}</div>}
@@ -181,7 +188,7 @@ export default function StudentsPage() {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button type="button" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }} className="px-4 py-2 border rounded-md text-sm hover:bg-muted">Cancel</button>
-              <button type="submit" disabled={submitting || noSession} className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm disabled:opacity-60">{submitting ? 'Saving...' : 'Add Student'}</button>
+              <button type="submit" disabled={submitting || noSession || noClasses} className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm disabled:opacity-60">{submitting ? 'Saving...' : 'Add Student'}</button>
             </div>
           </form>
         </div>
