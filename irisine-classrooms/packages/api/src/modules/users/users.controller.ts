@@ -26,8 +26,8 @@ export class UsersController {
 
   @Post()
   @Roles('SUPER_ADMIN', 'IT_ADMIN')
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  create(@Body() dto: CreateUserDto, @CurrentUser() actor: any) {
+    return this.usersService.create(dto, actor);
   }
 
   @Get()
@@ -42,13 +42,13 @@ export class UsersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findById(id);
+  findOne(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
+    return this.usersService.findInSchool(id, schoolId);
   }
 
   @Patch(':id')
   @Roles('SUPER_ADMIN', 'IT_ADMIN')
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateUserDto, @CurrentUser() actor: any) {
+    return this.usersService.update(id, dto, actor);
   }
 }

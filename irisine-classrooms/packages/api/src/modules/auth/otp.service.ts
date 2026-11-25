@@ -11,7 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { otpEmail } from '../email/templates/otp-email';
 
-export type OtpPurpose = 'SIGNUP' | 'RESET';
+export type OtpPurpose = 'RESET';
 type StoredPurpose = OtpPurpose | 'RESET_TOKEN';
 
 const INVALID = 'Invalid or expired code';
@@ -55,7 +55,7 @@ export class OtpService {
     return randomInt(0, 1_000_000).toString().padStart(6, '0');
   }
 
-  private async issue(email: string, purpose: StoredPurpose, code: string, minutes: number, payload?: string) {
+  private async issue(email: string, purpose: StoredPurpose, code: string, minutes: number) {
     await this.prisma.emailOtp.updateMany({
       where: { email, purpose, usedAt: null },
       data: { usedAt: new Date() }, // invalidate any earlier code
@@ -65,7 +65,6 @@ export class OtpService {
         email,
         purpose,
         codeHash: this.hash(email, purpose, code),
-        payload: payload ?? null,
         expiresAt: new Date(Date.now() + minutes * 60_000),
       },
     });
@@ -88,11 +87,11 @@ export class OtpService {
   }
 
   /** Create + email a code. Caller decides whether the address is eligible. */
-  async send(emailRaw: string, purpose: OtpPurpose, payload?: string) {
+  async send(emailRaw: string, purpose: OtpPurpose) {
     const email = this.normalize(emailRaw);
     await this.assertCooldown(email, purpose);
     const code = this.generateCode();
-    await this.issue(email, purpose, code, this.expiryMinutes, payload);
+    await this.issue(email, purpose, code, this.expiryMinutes);
     const { subject, html } = otpEmail({ code, purpose, minutes: this.expiryMinutes });
     try {
       await this.email.sendEmail(email, subject, html);
@@ -102,17 +101,8 @@ export class OtpService {
     }
   }
 
-  /** Pending sign-up details from the most recent SIGNUP code for this email (if any). */
-  async pendingPayload(emailRaw: string): Promise<string | null> {
-    const row = await this.prisma.emailOtp.findFirst({
-      where: { email: this.normalize(emailRaw), purpose: 'SIGNUP', payload: { not: null } },
-      orderBy: { createdAt: 'desc' },
-    });
-    return row?.payload ?? null;
-  }
-
-  /** Check a code and burn it. Returns the code's stored payload. Throws a generic 400 on any failure. */
-  async consume(emailRaw: string, purpose: StoredPurpose, code: string): Promise<string | null> {
+  /** Check a code and burn it. Throws a generic 400 on any failure. */
+  async consume(emailRaw: string, purpose: StoredPurpose, code: string): Promise<void> {
     const email = this.normalize(emailRaw);
     const row = await this.prisma.emailOtp.findFirst({
       where: { email, purpose, usedAt: null },
@@ -146,7 +136,6 @@ export class OtpService {
       data: { usedAt: new Date() },
     });
     if (burned.count !== 1) throw new BadRequestException(INVALID);
-    return row.payload ?? null;
   }
 
   /** After a RESET code is verified: a short-lived one-time token to set the new password. */

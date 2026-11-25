@@ -17,9 +17,15 @@ model School {
   phone     String?
   email     String?
   logoUrl   String?
+  city      String?
+  state     String?
+  country   String?
+  website   String?
+  status    String   @default("ACTIVE") // ACTIVE, SUSPENDED, DEACTIVATED (existing schools stay ACTIVE)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  features         SchoolFeature[]
   users            User[]
   academicSessions AcademicSession[]
   classes          Class[]
@@ -1671,7 +1677,6 @@ model EmailOtp {
   attempts  Int       @default(0)
   expiresAt DateTime
   usedAt    DateTime?
-  payload   String?   @db.Text // pending sign-up details (no password), SIGNUP only
   createdAt DateTime  @default(now())
 
   @@index([email, purpose, createdAt])
@@ -2583,4 +2588,94 @@ model TopicCoverageLog {
 
   @@unique([sessionId, moduleItemId])
   @@map("topic_coverage_logs")
+}
+
+
+// ─── Multi-tenant platform: features, onboarding, platform admins ──────
+
+/// Master list of ERP modules the platform owner can hand out to schools.
+model Feature {
+  key             String   @id // e.g. ATTENDANCE
+  name            String
+  description     String?  @db.Text
+  category        String   @default("GENERAL")
+  isCore          Boolean  @default(false) // core features are never gated
+  isActive        Boolean  @default(true)  // platform-wide kill switch
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  schools SchoolFeature[]
+
+  @@map("features")
+}
+
+/// Which feature a school may use. No row = no access.
+model SchoolFeature {
+  id              String   @id @default(uuid())
+  schoolId        String
+  featureKey      String
+  enabled         Boolean  @default(true)   // granted by the platform owner
+  adminManageable Boolean  @default(false)  // platform allows the school IT_ADMIN to switch it on/off
+  adminEnabled    Boolean  @default(true)   // the school-side switch (only used when adminManageable)
+  config          Json?
+  grantedBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  feature Feature @relation(fields: [featureKey], references: [key])
+
+  @@unique([schoolId, featureKey])
+  @@index([schoolId])
+  @@map("school_features")
+}
+
+/// Public school registration requests, reviewed by the platform owner.
+model SchoolRegistrationRequest {
+  id                String    @id @default(uuid())
+  schoolName        String
+  email             String    // school email, also where the admin invite is sent
+  phone             String
+  address           String
+  city              String
+  state             String
+  country           String
+  website           String?
+  contactPerson     String
+  requestedFeatures Json?     // array of feature keys the school asked for
+  status            String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewedBy        String?
+  reviewedAt        DateTime?
+  rejectionReason   String?
+  schoolId          String?   // set once approved
+  createdAt         DateTime  @default(now())
+
+  @@index([status])
+  @@index([email])
+  @@map("school_registration_requests")
+}
+
+/// One-time invite so a new school admin sets their own password.
+model AccountInvite {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("account_invites")
+}
+
+/// Platform owner accounts. Separate from school users: never created by signup.
+model PlatformAdmin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@map("platform_admins")
 }

@@ -63,7 +63,9 @@ export class CreateStudentDto {
   @IsString()
   academicSessionId: string;
 
-  @ApiProperty()
+  /** Ignored: the school always comes from the logged-in user. */
+  @ApiProperty({ required: false, deprecated: true })
+  @IsOptional()
   @IsString()
-  schoolId: string;
+  schoolId?: string;
 }

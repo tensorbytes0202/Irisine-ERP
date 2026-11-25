@@ -8,7 +8,7 @@ export class CreateUserDto {
 
   @ApiProperty()
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
   password: string;
 
   @ApiProperty()
@@ -28,7 +28,9 @@ export class CreateUserDto {
   @IsIn(['SUPER_ADMIN', 'DIRECTOR', 'ACADEMIC_COORDINATOR', 'CLASS_TEACHER', 'SUBJECT_TEACHER', 'ACCOUNTANT', 'TRANSPORT_MANAGER', 'HOBBY_COORDINATOR', 'IT_ADMIN', 'PARENT', 'STUDENT'])
   role: string;
 
-  @ApiProperty()
+  /** Ignored: the school is always taken from the logged-in user. Kept so older clients do not get a 400. */
+  @ApiProperty({ required: false, deprecated: true })
+  @IsOptional()
   @IsString()
-  schoolId: string;
+  schoolId?: string;
 }

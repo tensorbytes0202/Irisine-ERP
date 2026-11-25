@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { InvitesService } from '../platform/invites.service';
 
 export interface StudentImportRow {
   admissionNo: string;
@@ -24,13 +25,18 @@ export interface PaymentImportRow {
 
 @Injectable()
 export class BulkOperationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private invites: InvitesService,
+  ) {}
 
-  async importStudents(data: StudentImportRow[]): Promise<{ imported: number; errors: string[] }> {
+  async importStudents(data: StudentImportRow[], schoolId: string): Promise<{ imported: number; errors: string[] }> {
     const errors: string[] = [];
     let imported = 0;
 
-    const passwordHash = await bcrypt.hash('student123', 10);
+    // nobody knows this password; each student sets their own through an emailed invite
+    const passwordHash = await bcrypt.hash(InvitesService.unusablePasswordSeed(), 10);
+    const invitesToSend: { email: string; token: string }[] = [];
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
@@ -62,7 +68,7 @@ export class BulkOperationsService {
 
         // Resolve class by grade name
         const classRecord = await this.prisma.class.findFirst({
-          where: { grade: typeof row.classGrade === 'string' ? parseInt(row.classGrade, 10) : row.classGrade },
+          where: { schoolId, grade: typeof row.classGrade === 'string' ? parseInt(row.classGrade, 10) : row.classGrade },
         });
         if (!classRecord) {
           errors.push(`${rowLabel}: Class grade "${row.classGrade}" not found`);
@@ -79,14 +85,7 @@ export class BulkOperationsService {
         }
 
         // Resolve active academic session for this class's school
-        const school = await this.prisma.school.findFirst({
-          where: { classes: { some: { id: classRecord.id } } },
-          select: { id: true },
-        });
-        if (!school) {
-          errors.push(`${rowLabel}: Could not determine school for class "${row.classGrade}"`);
-          continue;
-        }
+        const school = { id: schoolId };
         const academicSession = await this.prisma.academicSession.findFirst({
           where: {
             schoolId: school.id,
@@ -122,6 +121,7 @@ export class BulkOperationsService {
               academicSessionId: academicSession.id,
             },
           });
+          invitesToSend.push({ email: row.email, token: await this.invites.issue(user.id, tx as any) });
         });
 
         imported++;
@@ -131,10 +131,13 @@ export class BulkOperationsService {
       }
     }
 
+    for (const inv of invitesToSend) {
+      await this.invites.send(inv.email, 'your school', inv.token);
+    }
     return { imported, errors };
   }
 
-  async importFeePayments(data: PaymentImportRow[]): Promise<{ imported: number; errors: string[] }> {
+  async importFeePayments(data: PaymentImportRow[], schoolId: string): Promise<{ imported: number; errors: string[] }> {
     const errors: string[] = [];
     let imported = 0;
 
@@ -148,8 +151,8 @@ export class BulkOperationsService {
           continue;
         }
 
-        const student = await this.prisma.student.findUnique({
-          where: { admissionNo: row.studentAdmissionNo },
+        const student = await this.prisma.student.findFirst({
+          where: { admissionNo: row.studentAdmissionNo, user: { schoolId } },
         });
         if (!student) {
           errors.push(`${rowLabel}: Student with admission number "${row.studentAdmissionNo}" not found`);
@@ -157,7 +160,7 @@ export class BulkOperationsService {
         }
 
         const feeHead = await this.prisma.feeHead.findFirst({
-          where: { name: row.feeHeadName },
+          where: { name: row.feeHeadName, class: { schoolId } },
         });
         if (!feeHead) {
           errors.push(`${rowLabel}: Fee head "${row.feeHeadName}" not found`);
@@ -201,9 +204,10 @@ export class BulkOperationsService {
     return { imported, errors };
   }
 
-  async exportStudents(classId?: string, sectionId?: string) {
+  async exportStudents(schoolId: string, classId?: string, sectionId?: string) {
     const students = await this.prisma.student.findMany({
       where: {
+        user: { schoolId },
         isActive: true,
         ...(classId && { classId }),
         ...(sectionId && { sectionId }),
@@ -234,7 +238,7 @@ export class BulkOperationsService {
     }));
   }
 
-  async exportAttendance(classId: string, sectionId: string, startDate: string, endDate: string) {
+  async exportAttendance(schoolId: string, classId: string, sectionId: string, startDate: string, endDate: string) {
     if (!classId || !startDate || !endDate) {
       throw new BadRequestException('classId, startDate, and endDate are required');
     }
@@ -244,6 +248,7 @@ export class BulkOperationsService {
         date: { gte: new Date(startDate), lte: new Date(endDate) },
         student: {
           classId,
+          user: { schoolId },
           ...(sectionId && { sectionId }),
         },
       },
@@ -270,14 +275,14 @@ export class BulkOperationsService {
     }));
   }
 
-  async exportGrades(classId: string, subjectId?: string) {
+  async exportGrades(schoolId: string, classId: string, subjectId?: string) {
     if (!classId) {
       throw new BadRequestException('classId is required');
     }
 
     const grades = await this.prisma.grade.findMany({
       where: {
-        student: { classId },
+        student: { classId, user: { schoolId } },
         ...(subjectId && { subjectId }),
       },
       include: {

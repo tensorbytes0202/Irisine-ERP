@@ -1,7 +1,6 @@
 import {
   Injectable,
   UnauthorizedException,
-  ConflictException,
   ForbiddenException,
   HttpException,
   BadRequestException,
@@ -12,7 +11,8 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
+import { createHash } from 'crypto';
+import { Portal, portalForRole } from './portals';
 import { OtpService, OtpPurpose } from './otp.service';
 import { randomUUID } from 'crypto';
 
@@ -27,7 +27,8 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email: dto.email.trim().toLowerCase() },
+      include: { school: { select: { status: true } } },
     });
 
     if (!user || !user.isActive) {
@@ -39,37 +40,42 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (user.school.status !== 'ACTIVE') {
+      throw new ForbiddenException({ code: 'SCHOOL_NOT_ACTIVE', message: 'Your school account is not active' });
+    }
+
+    // The portal the user picked is only a request. The real role comes from the database.
+    const portal = portalForRole(user.role);
+    if (dto.portal && dto.portal !== portal) {
+      throw new ForbiddenException('This account cannot sign in to that portal');
+    }
+
     return this.generateTokens(user);
   }
 
   /**
-   * Sign up step 1. Nothing is created yet: the school/name details are parked with
-   * the emailed code, and the password is NOT stored. The account (and its password)
-   * is created in verifyOtp, by whoever proves they own the inbox. So a stranger who
-   * submits someone else's email can never choose that account's password.
-   * Disabled unless ALLOW_SIGNUP=true (fail closed).
+   * First-time password for an account created by an approval (school admin) or by invite.
+   * The one-time token is stored only as a hash, expires, and can be used once.
    */
-  async register(dto: RegisterDto) {
-    if (this.config.get<string>('ALLOW_SIGNUP')?.toLowerCase() !== 'true') {
-      throw new ForbiddenException('Sign up is disabled');
+  async acceptInvite(token: string, password: string) {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const invite = await this.prisma.accountInvite.findUnique({ where: { tokenHash } });
+    if (!invite || invite.usedAt || invite.expiresAt < new Date()) {
+      throw new BadRequestException('This invite link is invalid or has expired');
     }
-
-    const email = this.otp.normalize(dto.email);
-    if (await this.prisma.user.findUnique({ where: { email } })) {
-      throw new ConflictException('An account with this email already exists');
-    }
-
-    const payload = JSON.stringify({
-      schoolName: dto.schoolName.trim(),
-      firstName: dto.firstName.trim(),
-      lastName: dto.lastName.trim(),
+    const passwordHash = await bcrypt.hash(password, 10);
+    const burned = await this.prisma.accountInvite.updateMany({
+      where: { id: invite.id, usedAt: null },
+      data: { usedAt: new Date() },
     });
-    try {
-      await this.otp.send(email, 'SIGNUP', payload);
-    } catch (err) {
-      if (!(err instanceof HttpException && err.getStatus() === 429)) throw err;
-    }
-    return { requiresVerification: true, email, message: 'We sent a verification code to your email.' };
+    if (burned.count !== 1) throw new BadRequestException('This invite link is invalid or has expired');
+
+    const user = await this.prisma.user.update({
+      where: { id: invite.userId },
+      data: { passwordHash, emailVerified: true },
+    });
+    await this.prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+    return this.generateTokens(user);
   }
 
   /**
@@ -80,19 +86,9 @@ export class AuthService {
     const email = this.otp.normalize(emailRaw);
     const user = await this.prisma.user.findUnique({ where: { email } });
 
-    let payload: string | undefined;
-    let eligible: boolean;
-    if (purpose === 'SIGNUP') {
-      // resend: only for a pending sign-up (no account yet, details already parked)
-      payload = (await this.otp.pendingPayload(email)) ?? undefined;
-      eligible = !user && !!payload;
-    } else {
-      eligible = !!user && user.isActive;
-    }
-
-    if (eligible) {
+    if (user && user.isActive) {
       try {
-        await this.otp.send(email, purpose, payload);
+        await this.otp.send(email, purpose);
       } catch (err) {
         if (!(err instanceof HttpException && err.getStatus() === 429)) throw err;
       }
@@ -103,58 +99,11 @@ export class AuthService {
     };
   }
 
-  async verifyOtp(emailRaw: string, code: string, purpose: OtpPurpose, password?: string) {
+  /** Email code check. Used for password reset: returns a one-time token for the new password. */
+  async verifyOtp(emailRaw: string, code: string, purpose: OtpPurpose) {
     const email = this.otp.normalize(emailRaw);
-
-    if (purpose === 'SIGNUP' && (!password || password.length < 8)) {
-      // checked before the code is consumed so a typo does not burn it
-      throw new BadRequestException('Password must be at least 8 characters');
-    }
-
-    const payload = await this.otp.consume(email, purpose, code);
-
-    if (purpose === 'RESET') {
-      return { resetToken: await this.otp.issueResetToken(email) };
-    }
-
-    // SIGNUP: the code proves inbox ownership, so create the account now.
-    let details: { schoolName: string; firstName: string; lastName: string };
-    try {
-      details = JSON.parse(payload ?? '');
-    } catch {
-      throw new BadRequestException('Invalid or expired code');
-    }
-    if (!details?.schoolName || !details.firstName || !details.lastName) {
-      throw new BadRequestException('Invalid or expired code');
-    }
-
-    const passwordHash = await bcrypt.hash(password as string, 10);
-    const slug = details.schoolName.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 8) || 'SCHOOL';
-    const schoolCode = `${slug}-${randomUUID().slice(0, 6).toUpperCase()}`;
-
-    let user;
-    try {
-      user = await this.prisma.$transaction(async (tx) => {
-        const school = await tx.school.create({
-          data: { name: details.schoolName, code: schoolCode, email },
-        });
-        return tx.user.create({
-          data: {
-            email,
-            passwordHash,
-            firstName: details.firstName,
-            lastName: details.lastName,
-            role: 'SUPER_ADMIN',
-            schoolId: school.id,
-            emailVerified: true,
-          },
-        });
-      });
-    } catch (err: any) {
-      if (err?.code === 'P2002') throw new ConflictException('An account with this email already exists');
-      throw err;
-    }
-    return this.generateTokens(user);
+    await this.otp.consume(email, purpose, code);
+    return { resetToken: await this.otp.issueResetToken(email) };
   }
 
   async refreshTokens(refreshToken: string) {
@@ -233,7 +182,9 @@ export class AuthService {
       schoolId: user.schoolId,
     };
 
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.config.get<string>('JWT_ACCESS_EXPIRES') || '7d',
+    });
 
     const refreshToken = randomUUID();
     const expiresAt = new Date();
@@ -254,6 +205,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         role: user.role,
+        portal: portalForRole(user.role) as Portal | null,
       },
     };
   }

@@ -1,5 +1,6 @@
 import {
   Controller,
+  UseGuards,
   Post,
   Get,
   Patch,
@@ -7,8 +8,13 @@ import {
   Param,
   Query,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { RemedialService } from './remedial.service';
 
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'PRINCIPAL', 'ACADEMIC_COORDINATOR', 'CLASS_TEACHER', 'SUBJECT_TEACHER')
 @Controller('remedial')
 export class RemedialController {
   constructor(private readonly service: RemedialService) {}

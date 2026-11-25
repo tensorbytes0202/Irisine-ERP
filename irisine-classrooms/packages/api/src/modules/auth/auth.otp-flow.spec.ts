@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
@@ -15,7 +15,7 @@ function build(user: any | null) {
   const config: any = { get: (k: string) => (({ ALLOW_SIGNUP: 'true' }) as any)[k] };
   const otp = new OtpService(prisma, config, { sendEmail: jest.fn() } as any);
   jest.spyOn(otp, 'send').mockResolvedValue(undefined);
-  jest.spyOn(otp, 'consume').mockResolvedValue(null);
+  jest.spyOn(otp, 'consume').mockResolvedValue(undefined);
   jest.spyOn(otp, 'issueResetToken').mockResolvedValue('reset-token-reset-token');
   const jwt: any = { sign: () => 'jwt' };
   const svc = new AuthService(prisma, jwt, config, otp);
@@ -34,7 +34,7 @@ describe('forgot password flow', () => {
   it('only sends a code to real accounts', async () => {
     const a = build(user);
     await a.svc.requestPasswordReset('a@test.com');
-    expect(a.otp.send).toHaveBeenCalledWith('a@test.com', 'RESET', undefined);
+    expect(a.otp.send).toHaveBeenCalledWith('a@test.com', 'RESET');
     const b = build(null);
     await b.svc.requestPasswordReset('nobody@test.com');
     expect(b.otp.send).not.toHaveBeenCalled();
@@ -56,85 +56,67 @@ describe('forgot password flow', () => {
   });
 });
 
-describe('sign-up (account created only after the code is verified)', () => {
-  const payload = JSON.stringify({ schoolName: 'Acme School', firstName: 'Mina', lastName: 'Rao' });
 
-  function buildSignup(existingUser: any | null, storedPayload: string | null = payload) {
-    const created: any = {};
-    const tx: any = {
-      school: { create: jest.fn(async ({ data }: any) => ({ id: 's1', ...data })) },
-      user: {
-        create: jest.fn(async ({ data }: any) => {
-          Object.assign(created, data);
-          return { id: 'u9', ...data };
-        }),
-      },
-    };
-    const prisma: any = {
-      user: { findUnique: jest.fn(async () => existingUser), update: jest.fn() },
-      refreshToken: { create: jest.fn(async () => ({})) },
-      $transaction: jest.fn(async (fn: any) => fn(tx)),
-    };
-    const config: any = { get: (k: string) => (({ ALLOW_SIGNUP: 'true' }) as any)[k] };
-    const otp = new OtpService(prisma, config, { sendEmail: jest.fn() } as any);
-    jest.spyOn(otp, 'send').mockResolvedValue(undefined);
-    jest.spyOn(otp, 'consume').mockResolvedValue(storedPayload);
-    jest.spyOn(otp, 'pendingPayload').mockResolvedValue(storedPayload);
-    const svc = new AuthService(prisma, { sign: () => 'jwt' } as any, config, otp);
-    return { svc, prisma, otp, created, tx };
+describe('login: portal and school status are checked on the server', () => {
+  async function loginWith(role: string, schoolStatus = 'ACTIVE') {
+    const passwordHash = await bcrypt.hash('Passw0rd!', 4);
+    const user = { id: 'u', email: 'x@test.com', passwordHash, isActive: true, role, schoolId: 's', school: { status: schoolStatus } };
+    return build(user as any);
   }
 
-  const dto = { schoolName: 'Acme School', firstName: 'Mina', lastName: 'Rao', email: 'N@Test.com', password: 'ignored-here' };
-
-  it('register creates nothing and never stores the password', async () => {
-    const { svc, prisma, otp } = buildSignup(null);
-    await svc.register(dto);
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-    const sent = (otp.send as jest.Mock).mock.calls[0];
-    expect(sent[0]).toBe('n@test.com');
-    expect(sent[2]).not.toContain('ignored-here');
+  it('lets a teacher into the FACULTY portal and reports the portal', async () => {
+    const { svc } = await loginWith('CLASS_TEACHER');
+    const res: any = await svc.login({ email: 'x@test.com', password: 'Passw0rd!', portal: 'FACULTY' });
+    expect(res.user.portal).toBe('FACULTY');
   });
 
-  it('register rejects an email that already has an account', async () => {
-    const { svc } = buildSignup({ id: 'u1' });
-    await expect(svc.register(dto)).rejects.toBeInstanceOf(ConflictException);
+  it('refuses a student who asks for the IT_ADMIN portal', async () => {
+    const { svc } = await loginWith('STUDENT');
+    await expect(svc.login({ email: 'x@test.com', password: 'Passw0rd!', portal: 'IT_ADMIN' })).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('a second submission cannot change the password of the account: password only comes from verify', async () => {
-    const { svc, created } = buildSignup(null);
-    await svc.register({ ...dto, password: 'attacker-pass-1' });
-    await svc.verifyOtp('n@test.com', '123456', 'SIGNUP', 'victim-pass-99');
-    expect(await bcrypt.compare('victim-pass-99', created.passwordHash)).toBe(true);
-    expect(await bcrypt.compare('attacker-pass-1', created.passwordHash)).toBe(false);
+  it('refuses a faculty member who asks for the SUPER_ADMIN portal', async () => {
+    const { svc } = await loginWith('SUBJECT_TEACHER');
+    await expect(svc.login({ email: 'x@test.com', password: 'Passw0rd!', portal: 'SUPER_ADMIN' })).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('verify creates a verified SUPER_ADMIN and returns tokens', async () => {
-    const { svc, created } = buildSignup(null);
-    const res: any = await svc.verifyOtp('n@test.com', '123456', 'SIGNUP', 'GoodPass123');
-    expect(created).toMatchObject({ email: 'n@test.com', role: 'SUPER_ADMIN', emailVerified: true });
+  it('blocks everyone in a suspended school (after the password is checked)', async () => {
+    const { svc } = await loginWith('SUPER_ADMIN', 'SUSPENDED');
+    await expect(svc.login({ email: 'x@test.com', password: 'Passw0rd!' })).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(svc.login({ email: 'x@test.com', password: 'wrong-password' })).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+});
+
+describe('accept invite (first password for an approved school admin)', () => {
+  function buildInvite(invite: any) {
+    const prisma: any = {
+      accountInvite: {
+        findUnique: jest.fn(async () => invite),
+        updateMany: jest.fn(async () => ({ count: 1 })),
+      },
+      user: { update: jest.fn(async ({ data }: any) => ({ id: 'u1', email: 'a@test.com', role: 'SUPER_ADMIN', schoolId: 's', ...data })) },
+      refreshToken: { deleteMany: jest.fn(async () => ({})), create: jest.fn(async () => ({})) },
+    };
+    const config: any = { get: () => undefined };
+    const otp = new OtpService(prisma, config, { sendEmail: jest.fn() } as any);
+    return { svc: new AuthService(prisma, { sign: () => 'jwt' } as any, config, otp), prisma };
+  }
+  const token = 'a'.repeat(64);
+
+  it('sets the password and returns tokens for a valid invite', async () => {
+    const { svc, prisma } = buildInvite({ id: 'i1', userId: 'u1', usedAt: null, expiresAt: new Date(Date.now() + 60_000) });
+    const res: any = await svc.acceptInvite(token, 'MyNewPass123');
+    expect(await bcrypt.compare('MyNewPass123', prisma.user.update.mock.calls[0][0].data.passwordHash)).toBe(true);
     expect(res.accessToken).toBe('jwt');
   });
 
-  it('verify without a valid password fails before the code is burned', async () => {
-    const { svc, otp } = buildSignup(null);
-    await expect(svc.verifyOtp('n@test.com', '123456', 'SIGNUP', 'short')).rejects.toBeInstanceOf(BadRequestException);
-    expect(otp.consume).not.toHaveBeenCalled();
-  });
-
-  it('verify fails if the code carries no pending sign-up details', async () => {
-    const { svc } = buildSignup(null, null);
-    await expect(svc.verifyOtp('n@test.com', '123456', 'SIGNUP', 'GoodPass123')).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('resend only works for a pending sign-up with no account', async () => {
-    const a = buildSignup(null);
-    await a.svc.sendOtp('n@test.com', 'SIGNUP');
-    expect(a.otp.send).toHaveBeenCalledWith('n@test.com', 'SIGNUP', payload);
-    const b = buildSignup({ id: 'u1', isActive: true });
-    await b.svc.sendOtp('n@test.com', 'SIGNUP');
-    expect(b.otp.send).not.toHaveBeenCalled();
-    const c = buildSignup(null, null);
-    await c.svc.sendOtp('n@test.com', 'SIGNUP');
-    expect(c.otp.send).not.toHaveBeenCalled();
+  it.each([
+    ['unknown', null],
+    ['used', { id: 'i1', userId: 'u1', usedAt: new Date(), expiresAt: new Date(Date.now() + 60_000) }],
+    ['expired', { id: 'i1', userId: 'u1', usedAt: null, expiresAt: new Date(Date.now() - 1000) }],
+  ])('rejects an %s invite', async (_n, invite) => {
+    const { svc, prisma } = buildInvite(invite);
+    await expect(svc.acceptInvite(token, 'MyNewPass123')).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });

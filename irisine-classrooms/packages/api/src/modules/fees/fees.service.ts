@@ -3,12 +3,18 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { UpdateDefaulterDto } from './dto/update-defaulter.dto';
+import { Actor, TenantService } from '../platform/tenant.service';
 
 @Injectable()
 export class FeesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private tenant: TenantService,
+  ) {}
 
-  async createFeeHead(dto: CreateFeeHeadDto) {
+  async createFeeHead(dto: CreateFeeHeadDto, actor: Actor) {
+    await this.tenant.classInSchool(dto.classId, actor.schoolId);
+    await this.tenant.sessionInSchool(dto.academicSessionId, actor.schoolId);
     return this.prisma.feeHead.create({
       data: {
         name: dto.name,
@@ -42,9 +48,10 @@ export class FeesService {
     });
   }
 
-  async getAllFeeHeads(filters: { classId?: string; academicSessionId?: string }) {
+  async getAllFeeHeads(filters: { classId?: string; academicSessionId?: string }, actor: Actor) {
     return this.prisma.feeHead.findMany({
       where: {
+        class: { schoolId: actor.schoolId },
         ...(filters.classId && { classId: filters.classId }),
         ...(filters.academicSessionId && { academicSessionId: filters.academicSessionId }),
       },
@@ -57,7 +64,9 @@ export class FeesService {
     });
   }
 
-  async recordPayment(dto: RecordPaymentDto, receivedBy: string) {
+  async recordPayment(dto: RecordPaymentDto, receivedBy: string, actor: Actor) {
+    await this.tenant.feeHeadInSchool(dto.feeHeadId, actor.schoolId);
+    await this.tenant.studentInSchool(dto.studentId, actor.schoolId);
     // Check if receipt number is unique
     const existing = await this.prisma.payment.findUnique({
       where: { receiptNo: dto.receiptNo },
@@ -115,9 +124,8 @@ export class FeesService {
     return payment;
   }
 
-  async getStudentPayments(studentId: string) {
-    const student = await this.prisma.student.findUnique({ where: { id: studentId } });
-    if (!student) throw new NotFoundException('Student not found');
+  async getStudentPayments(studentId: string, actor: Actor) {
+    await this.tenant.assertCanViewStudent(actor, studentId);
 
     return this.prisma.payment.findMany({
       where: { studentId },
@@ -129,9 +137,10 @@ export class FeesService {
     });
   }
 
-  async getDefaulters(filters: { status?: string; academicSessionId?: string }) {
+  async getDefaulters(filters: { status?: string; academicSessionId?: string }, actor: Actor) {
     return this.prisma.defaulterRecord.findMany({
       where: {
+        student: { user: { schoolId: actor.schoolId } },
         ...(filters.status && { status: filters.status }),
         ...(filters.academicSessionId && {
           feeHead: { academicSessionId: filters.academicSessionId },
@@ -152,8 +161,8 @@ export class FeesService {
     });
   }
 
-  async updateDefaulterStatus(id: string, dto: UpdateDefaulterDto) {
-    const record = await this.prisma.defaulterRecord.findUnique({ where: { id } });
+  async updateDefaulterStatus(id: string, dto: UpdateDefaulterDto, actor: Actor) {
+    const record = await this.prisma.defaulterRecord.findFirst({ where: { id, student: { user: { schoolId: actor.schoolId } } } });
     if (!record) throw new NotFoundException('Defaulter record not found');
 
     const data: Record<string, unknown> = { ...dto };

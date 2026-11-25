@@ -1,13 +1,19 @@
 import {
   Controller,
+  UseGuards,
   Post,
   Get,
   Body,
   Param,
   Query,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { GraceMarksService, CreateGraceMarkDto } from './grace-marks.service';
 
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'PRINCIPAL', 'ACADEMIC_COORDINATOR', 'CLASS_TEACHER', 'SUBJECT_TEACHER')
 @Controller('grace-marks')
 export class GraceMarksController {
   constructor(private readonly service: GraceMarksService) {}

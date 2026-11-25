@@ -1,24 +1,37 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Actor, TenantService } from '../platform/tenant.service';
+import { InvitesService } from '../platform/invites.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 
 @Injectable()
 export class StudentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private tenant: TenantService,
+    private invites: InvitesService,
+  ) {}
 
-  async create(dto: CreateStudentDto) {
-    const passwordHash = await bcrypt.hash('student123', 10);
+  async create(dto: CreateStudentDto, actor: Actor) {
+    // every id the client sends must belong to the caller's own school
+    await this.tenant.classInSchool(dto.classId, actor.schoolId);
+    await this.tenant.sectionInSchool(dto.sectionId, actor.schoolId, dto.classId);
+    await this.tenant.sessionInSchool(dto.academicSessionId, actor.schoolId);
 
-    return this.prisma.$transaction(async (tx) => {
+    // nobody knows this password; the student sets their own through the emailed invite link
+    const passwordHash = await bcrypt.hash(InvitesService.unusablePasswordSeed(), 10);
+    const email = dto.email.trim().toLowerCase();
+
+    const { student, token } = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          email: dto.email,
+          email,
           passwordHash,
           firstName: dto.firstName,
           lastName: dto.lastName,
           role: 'STUDENT',
-          schoolId: dto.schoolId,
+          schoolId: actor.schoolId,
         },
       });
 
@@ -40,13 +53,18 @@ export class StudentsService {
         include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } },
       });
 
-      return student;
+      const token = await this.invites.issue(user.id, tx as any);
+      return { student, token };
     });
+
+    const inviteEmailSent = await this.invites.send(email, 'your school', token);
+    return { ...student, inviteEmailSent };
   }
 
-  async findAll(filters: { classId?: string; sectionId?: string; academicSessionId?: string }) {
+  async findAll(filters: { classId?: string; sectionId?: string; academicSessionId?: string }, actor: Actor) {
     return this.prisma.student.findMany({
       where: {
+        user: { schoolId: actor.schoolId },
         isActive: true,
         ...(filters.classId && { classId: filters.classId }),
         ...(filters.sectionId && { sectionId: filters.sectionId }),
@@ -61,7 +79,8 @@ export class StudentsService {
     });
   }
 
-  async findById(id: string) {
+  async findById(id: string, actor: Actor) {
+    await this.tenant.assertCanViewStudent(actor, id);
     const student = await this.prisma.student.findUnique({
       where: { id },
       include: {

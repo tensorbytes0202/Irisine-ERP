@@ -81,7 +81,8 @@ async function main() {
   }
 
   // Create a sample teacher
-  const teacherHash = await bcrypt.hash('teacher123', 10);
+  const teacherPassword = process.env.TEACHER_SEED_PASSWORD || adminPassword;
+  const teacherHash = await bcrypt.hash(teacherPassword, 10);
   await prisma.user.create({
     data: {
       email: 'teacher@irisine.demo',
@@ -263,8 +264,8 @@ async function main() {
   console.log('Seed complete!');
   console.log(`School: ${school.name} (${school.id})`);
   console.log(`Session: ${session.name}`);
-  console.log('Admin login: admin@irisine.demo / admin123');
-  console.log('Teacher login: teacher@irisine.demo / teacher123');
+  console.log('Admin login: admin@irisine.demo (password from ADMIN_SEED_PASSWORD)');
+  console.log('Teacher login: teacher@irisine.demo (password from TEACHER_SEED_PASSWORD, or ADMIN_SEED_PASSWORD)');
 }
 
 main()

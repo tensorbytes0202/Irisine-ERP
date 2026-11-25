@@ -107,9 +107,9 @@ export default function LoginPage() {
           </div>
 
           <p className="text-center text-sm text-muted-foreground">
-            New here?{' '}
-            <Link href="/signup" className="text-primary hover:underline">
-              Create an account
+            Want to use {brand.name} for your school?{' '}
+            <Link href="/register-school" className="text-primary hover:underline">
+              Request access
             </Link>
           </p>
         </form>

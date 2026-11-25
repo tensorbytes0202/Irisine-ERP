@@ -53,10 +53,10 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 Sign In
               </Link>
               <Link
-                href="/signup"
+                href="/register-school"
                 className="text-sm font-medium px-5 py-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
               >
-                Sign Up
+                Register School
               </Link>
             </div>
 
@@ -91,11 +91,11 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 Sign In
               </Link>
               <Link
-                href="/signup"
+                href="/register-school"
                 onClick={() => setMobileOpen(false)}
                 className="block text-center text-sm font-medium px-4 py-2 rounded-full bg-primary text-primary-foreground"
               >
-                Sign Up
+                Register School
               </Link>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import {
   Controller,
+  UseGuards,
   Post,
   Patch,
   Get,
@@ -7,8 +8,13 @@ import {
   Param,
   Query,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { ResultWorkflowService } from './result-workflow.service';
 
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'PRINCIPAL', 'ACADEMIC_COORDINATOR', 'CLASS_TEACHER', 'SUBJECT_TEACHER')
 @Controller('result-workflow')
 export class ResultWorkflowController {
   constructor(private readonly service: ResultWorkflowService) {}
@@ -48,6 +54,7 @@ export class ResultWorkflowController {
     return this.service.review(id, body.reviewedBy, body.status, body.remarks);
   }
 
+  @Roles('SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'PRINCIPAL', 'ACADEMIC_COORDINATOR')
   @Patch(':id/approve')
   approve(
     @Param('id') id: string,
@@ -56,11 +63,13 @@ export class ResultWorkflowController {
     return this.service.approve(id, body.approvedBy);
   }
 
+  @Roles('SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'PRINCIPAL', 'ACADEMIC_COORDINATOR')
   @Patch(':id/publish')
   publish(@Param('id') id: string) {
     return this.service.publish(id);
   }
 
+  @Roles('SUPER_ADMIN', 'ADMIN', 'DIRECTOR', 'PRINCIPAL', 'ACADEMIC_COORDINATOR')
   @Patch(':id/reject')
   reject(
     @Param('id') id: string,

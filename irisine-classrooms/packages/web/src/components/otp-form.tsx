@@ -7,7 +7,7 @@ const COOLDOWN = 60;
 
 /**
  * Six-digit email code entry with verify button, resend countdown and messages.
- * `onVerified` receives the API response (tokens for SIGNUP, resetToken for RESET).
+ * `onVerified` receives the API response (the one-time resetToken).
  */
 export function OtpForm({
   email,
@@ -15,14 +15,12 @@ export function OtpForm({
   onVerified,
   onBack,
   autoSent = true,
-  password,
 }: {
   email: string;
-  purpose: 'SIGNUP' | 'RESET';
+  purpose: 'RESET';
   onVerified: (data: any) => void;
   onBack?: () => void;
   autoSent?: boolean; // a code was just sent by the previous step
-  password?: string; // SIGNUP only: the password is set when the code is verified
 }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -41,18 +39,12 @@ export function OtpForm({
     if (loading) return;
     setError('');
     setInfo('');
-    // Only the 6-digit code is validated here. For sign-up the password was already
-    // validated on the sign-up form and is only carried (in memory) to the API call.
-    if (purpose === 'SIGNUP' && !password) {
-      setError('Your sign-up session was lost (page refreshed). Please go back and fill the form again.');
-      return;
-    }
     setLoading(true);
     try {
       const res = await fetch(`${API}/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp: code, purpose, ...(purpose === 'SIGNUP' ? { password } : {}) }),
+        body: JSON.stringify({ email, otp: code, purpose }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

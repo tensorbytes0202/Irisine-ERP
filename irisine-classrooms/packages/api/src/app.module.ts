@@ -102,6 +102,8 @@ import { DiscussionsModule } from './modules/discussions/discussions.module';
 import { GamificationModule } from './modules/gamification/gamification.module';
 // Phase 24 — Teaching Tracking
 import { TeachingModule } from './modules/teaching/teaching.module';
+// Platform (multi-tenant)
+import { PlatformModule } from './modules/platform/platform.module';
 // Audit
 import { AuditModule } from './modules/audit/audit.module';
 
@@ -109,6 +111,8 @@ import { AuditModule } from './modules/audit/audit.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    // Multi-tenant platform: features, school onboarding, feature guard
+    PlatformModule,
     // Audit (global — register early so any service can inject AuditService)
     AuditModule,
     // Phase 1

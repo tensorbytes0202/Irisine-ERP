@@ -19,7 +19,7 @@ Outstanding amount = fee head amount - approved concessions - what is already pa
 4. After payment, the browser calls `POST /api/v1/payments/verify`. The server checks the Razorpay signature (HMAC SHA256) and only then marks the order paid and creates the receipt (a row in the existing `payments` table, method `ONLINE`).
 5. Razorpay also calls `POST /api/v1/payments/webhook`. It is signature checked and idempotent, so the same payment is never counted twice, even if verify and webhook both arrive.
 
-**Email OTP.** Sign-up and password reset use a 6-digit code emailed through Resend. Only an HMAC of the code is stored. A code lasts 5 minutes, allows 5 wrong tries, can be resent after 60 seconds, and a new code cancels the old one.
+**Email OTP.** Password reset uses a 6-digit code emailed through Resend (public sign-up no longer exists: schools register through an approval workflow, see MULTI_TENANT_PART1.md). Only an HMAC of the code is stored. A code lasts 5 minutes, allows 5 wrong tries, can be resent after 60 seconds, and a new code cancels the old one.
 
 ---
 
@@ -88,7 +88,7 @@ Add to the API `.env` (see `.env.example` for the placeholders):
 | `OTP_RESEND_COOLDOWN_SECONDS` | Default 60 |
 | `OTP_MAX_ATTEMPTS` | Default 5 |
 | `OTP_SECRET` | Optional. Key for hashing codes. Defaults to `JWT_SECRET` |
-| `ALLOW_SIGNUP` | `true` to allow public sign-up (default off) |
+| `APP_URL` | Public web address, used in invite links |
 
 The frontend needs no payment keys. The public Key Id is sent to the browser by the server when an order is created.
 
@@ -121,7 +121,7 @@ cd packages/api && npx prisma db push && npx nest build && node dist/main.js
 cd packages/web && npx next dev --port 3000
 ```
 
-- Set `ALLOW_SIGNUP=true`, sign up at http://localhost:3000/signup. Without `RESEND_API_KEY` the 6-digit code is printed in the API console.
+- Without `RESEND_API_KEY` emails (reset codes, invite links) are printed in the API console in development.
 - Automated tests (no real emails or payments needed):
   ```bash
   cd packages/api && npx jest
@@ -136,9 +136,9 @@ cd packages/web && npx next dev --port 3000
 2. Set `NODE_ENV=production`.
 3. Run `npx prisma db push` against the production database once.
 4. Set `CORS_ORIGIN` to your real web address.
-5. Decide on `ALLOW_SIGNUP`. With it on, anyone on the internet can create a school and admin account.
+5. Create the platform owner once with `prisma/create-platform-admin.ts` (see MULTI_TENANT_PART1.md).
 6. Configure the Razorpay webhook with your public API URL and send a test event from the dashboard.
-7. Verify your Resend domain and send yourself a sign-up code.
+7. Verify your Resend domain and send yourself a password-reset code.
 
 If your API runs behind a proxy (Render, Nginx), make sure it forwards the client IP so rate limits work per user, not per proxy.
 
@@ -166,9 +166,9 @@ All routes are under `/api/v1`.
 | `GET /payments/history?status=&studentId=` | parent/student: own children; staff: whole school | Transactions |
 | `GET /payments/:id` | with access to that student | One order |
 | `GET /payments/receipt/:id` | with access to that student | Receipt data for a paid order |
-| `POST /auth/register` | public | Creates the account unverified and emails a code |
-| `POST /auth/send-otp`, `POST /auth/resend-otp` | public | Body `{ email, purpose: SIGNUP or RESET }` |
-| `POST /auth/verify-otp` | public | Body `{ email, otp, purpose }`. SIGNUP returns tokens; RESET returns a one-time `resetToken` |
+| `POST /auth/accept-invite` | public | Body `{ token, password }`. First password for an invited account |
+| `POST /auth/send-otp`, `POST /auth/resend-otp` | public | Body `{ email, purpose: RESET }` |
+| `POST /auth/verify-otp` | public | Body `{ email, otp, purpose: RESET }`. Returns a one-time `resetToken` |
 | `POST /auth/forgot-password` | public | Same as send-otp with RESET |
 | `POST /auth/reset-password` | public | Body `{ email, resetToken, newPassword }`. Signs the user out everywhere |
 

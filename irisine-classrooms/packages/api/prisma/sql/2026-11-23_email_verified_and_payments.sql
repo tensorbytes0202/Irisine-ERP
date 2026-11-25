@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS `email_otps` (
     `attempts` INTEGER NOT NULL DEFAULT 0,
     `expiresAt` DATETIME(3) NOT NULL,
     `usedAt` DATETIME(3) NULL,
-    `payload` TEXT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     INDEX `email_otps_email_purpose_createdAt_idx`(`email`, `purpose`, `createdAt`),
     PRIMARY KEY (`id`)

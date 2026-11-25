@@ -6,10 +6,10 @@ export class SendOtpDto {
   @IsEmail()
   email: string;
 
-  @ApiPropertyOptional({ enum: ['SIGNUP', 'RESET'], default: 'SIGNUP' })
+  @ApiPropertyOptional({ enum: ['RESET'], default: 'RESET' })
   @IsOptional()
-  @IsIn(['SIGNUP', 'RESET'])
-  purpose?: 'SIGNUP' | 'RESET';
+  @IsIn(['RESET'])
+  purpose?: 'RESET';
 }
 
 export class VerifyOtpDto extends SendOtpDto {
@@ -18,12 +18,6 @@ export class VerifyOtpDto extends SendOtpDto {
   @Length(6, 6)
   @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
   otp: string;
-
-  @ApiPropertyOptional({ description: 'Required for SIGNUP: the password for the new account' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(72)
-  password?: string;
 }
 
 export class ResetPasswordDto {
@@ -42,4 +36,18 @@ export class ResetPasswordDto {
   @MinLength(8)
   @MaxLength(72)
   newPassword: string;
+}
+
+export class AcceptInviteDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(32)
+  @MaxLength(200)
+  token: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  password: string;
 }

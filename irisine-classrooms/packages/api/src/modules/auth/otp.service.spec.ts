@@ -43,7 +43,7 @@ describe('OTP generation', () => {
   it('makes 6-digit numeric codes and stores only a hash', async () => {
     const { svc, rows, lastCode } = build();
     expect(svc.generateCode()).toMatch(/^\d{6}$/);
-    await svc.send('A@Test.com', 'SIGNUP');
+    await svc.send('A@Test.com', 'RESET');
     const code = lastCode();
     expect(code).toMatch(/^\d{6}$/);
     expect(JSON.stringify(rows)).not.toContain(code);
@@ -53,7 +53,7 @@ describe('OTP generation', () => {
 
   it('expires after OTP_EXPIRY_MINUTES (default 5)', async () => {
     const { svc, rows } = build();
-    await svc.send('a@test.com', 'SIGNUP');
+    await svc.send('a@test.com', 'RESET');
     const ms = rows[0].expiresAt.getTime() - Date.now();
     expect(ms).toBeGreaterThan(4.9 * 60_000);
     expect(ms).toBeLessThanOrEqual(5 * 60_000);
@@ -63,67 +63,67 @@ describe('OTP generation', () => {
 describe('OTP verification', () => {
   it('accepts the right code once, then rejects reuse (duplicate verification)', async () => {
     const { svc, lastCode } = build();
-    await svc.send('a@test.com', 'SIGNUP');
+    await svc.send('a@test.com', 'RESET');
     const code = lastCode();
-    await expect(svc.consume('a@test.com', 'SIGNUP', code)).resolves.toBeNull();
-    await expect(svc.consume('a@test.com', 'SIGNUP', code)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.consume('a@test.com', 'RESET', code)).resolves.toBeUndefined();
+    await expect(svc.consume('a@test.com', 'RESET', code)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects an incorrect code', async () => {
     const { svc, lastCode } = build();
-    await svc.send('a@test.com', 'SIGNUP');
+    await svc.send('a@test.com', 'RESET');
     const wrong = lastCode() === '000000' ? '111111' : '000000';
-    await expect(svc.consume('a@test.com', 'SIGNUP', wrong)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.consume('a@test.com', 'RESET', wrong)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects an expired code', async () => {
     const { svc, rows, lastCode } = build();
-    await svc.send('a@test.com', 'SIGNUP');
+    await svc.send('a@test.com', 'RESET');
     const code = lastCode();
     rows[0].expiresAt = new Date(Date.now() - 1000);
-    await expect(svc.consume('a@test.com', 'SIGNUP', code)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.consume('a@test.com', 'RESET', code)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('locks the code after the maximum attempts, even for the right code', async () => {
     const { svc, lastCode } = build();
-    await svc.send('a@test.com', 'SIGNUP');
+    await svc.send('a@test.com', 'RESET');
     const code = lastCode();
     const wrong = code === '000000' ? '111111' : '000000';
     for (let i = 0; i < 5; i++) {
-      await expect(svc.consume('a@test.com', 'SIGNUP', wrong)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(svc.consume('a@test.com', 'RESET', wrong)).rejects.toBeInstanceOf(BadRequestException);
     }
-    await expect(svc.consume('a@test.com', 'SIGNUP', code)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.consume('a@test.com', 'RESET', code)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('a new code invalidates the previous one', async () => {
     const { svc, rows, lastCode } = build({ OTP_RESEND_COOLDOWN_SECONDS: '0' });
-    await svc.send('a@test.com', 'SIGNUP');
-    await svc.send('a@test.com', 'SIGNUP');
+    await svc.send('a@test.com', 'RESET');
+    await svc.send('a@test.com', 'RESET');
     const second = lastCode();
     expect(rows.filter((r) => !r.usedAt)).toHaveLength(1);
-    await expect(svc.consume('a@test.com', 'SIGNUP', second)).resolves.toBeNull();
+    await expect(svc.consume('a@test.com', 'RESET', second)).resolves.toBeUndefined();
   });
 
   it('keeps purposes separate', async () => {
     const { svc, lastCode } = build();
-    await svc.send('a@test.com', 'SIGNUP');
-    await expect(svc.consume('a@test.com', 'RESET', lastCode())).rejects.toBeInstanceOf(BadRequestException);
+    await svc.send('a@test.com', 'RESET');
+    await expect(svc.consume('a@test.com', 'RESET_TOKEN', lastCode())).rejects.toBeInstanceOf(BadRequestException);
   });
 });
 
 describe('resend cooldown', () => {
   it('blocks a second code inside 60 seconds with HTTP 429', async () => {
     const { svc, email } = build();
-    await svc.send('a@test.com', 'SIGNUP');
-    await expect(svc.send('a@test.com', 'SIGNUP')).rejects.toMatchObject({ status: 429 });
+    await svc.send('a@test.com', 'RESET');
+    await expect(svc.send('a@test.com', 'RESET')).rejects.toMatchObject({ status: 429 });
     expect(email.sendEmail).toHaveBeenCalledTimes(1);
   });
 
   it('allows a new code after the cooldown', async () => {
     const { svc, rows } = build();
-    await svc.send('a@test.com', 'SIGNUP');
+    await svc.send('a@test.com', 'RESET');
     rows[0].createdAt = new Date(Date.now() - 61_000);
-    await expect(svc.send('a@test.com', 'SIGNUP')).resolves.toBeUndefined();
+    await expect(svc.send('a@test.com', 'RESET')).resolves.toBeUndefined();
   });
 });
 
@@ -131,7 +131,7 @@ describe('password reset token', () => {
   it('is single use', async () => {
     const { svc } = build();
     const token = await svc.issueResetToken('a@test.com');
-    await expect(svc.consume('a@test.com', 'RESET_TOKEN', token)).resolves.toBeNull();
+    await expect(svc.consume('a@test.com', 'RESET_TOKEN', token)).resolves.toBeUndefined();
     await expect(svc.consume('a@test.com', 'RESET_TOKEN', token)).rejects.toBeInstanceOf(BadRequestException);
   });
 });
