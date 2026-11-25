@@ -1,5 +1,7 @@
 # Multi-tenant platform: Part 1 (backend foundation)
 
+> **Updated 2026-11-26:** the platform owner is now the `IT_ADMIN` user whose email is listed in the API setting `PLATFORM_OWNER_EMAILS` (sign in with the IT Admin card, manage schools under `/it-admin/schools`). The separate platform login, the `create-platform-admin.ts` script and the `/platform` pages were removed; `platform_admins` is unused. Where this document says otherwise, this note wins.
+
 Date: 2026-11-25. Scope: backend, database, authentication, authorization, school onboarding,
 tenant isolation and feature entitlement. The four portal screens are Part 2.
 

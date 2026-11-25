@@ -4,6 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { isItAdminRoute } from '../it-admin-scope';
+import { isPlatformOwner } from '../platform-owner';
 
 /**
  * Every request re-checks the account in the database, so a deactivated user, a changed role
@@ -12,7 +13,7 @@ import { isItAdminRoute } from '../it-admin-scope';
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(config: ConfigService, private prisma: PrismaService) {
+  constructor(private config: ConfigService, private prisma: PrismaService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -22,12 +23,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(req: any, payload: any) {
-    if (payload.role === 'PLATFORM_SUPER_ADMIN') {
-      const admin = await this.prisma.platformAdmin.findUnique({ where: { id: payload.sub } });
-      if (!admin || !admin.isActive) throw new UnauthorizedException();
-      return { sub: admin.id, email: admin.email, role: 'PLATFORM_SUPER_ADMIN', schoolId: null };
-    }
-
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true, email: true, role: true, isActive: true, schoolId: true, school: { select: { status: true } } },
@@ -36,6 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (user.role === 'IT_ADMIN' && !isItAdminRoute(req.route?.path ?? req.path ?? '')) {
       throw new ForbiddenException('The IT Admin account cannot use this module');
     }
-    return { sub: user.id, email: user.email, role: user.role, schoolId: user.schoolId };
+    const isOwner = isPlatformOwner(user, this.config.get<string>('PLATFORM_OWNER_EMAILS'));
+    return { sub: user.id, email: user.email, role: user.role, schoolId: user.schoolId, isOwner };
   }
 }

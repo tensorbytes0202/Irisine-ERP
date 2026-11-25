@@ -11,7 +11,7 @@ import { LimitsService } from './limits.service';
 import { InvitesService } from './invites.service';
 import { TenantService } from './tenant.service';
 import { SchoolProfileService } from './school-profile.service';
-import { PlatformController, PlatformPublicController, SchoolFeaturesController } from './platform.controller';
+import { PlatformController, SchoolFeaturesController } from './platform.controller';
 
 @Global()
 @Module({
@@ -23,7 +23,7 @@ import { PlatformController, PlatformPublicController, SchoolFeaturesController 
       inject: [ConfigService],
     }),
   ],
-  controllers: [PlatformPublicController, PlatformController, SchoolFeaturesController],
+  controllers: [PlatformController, SchoolFeaturesController],
   providers: [
     FeaturesService,
     PlatformService,

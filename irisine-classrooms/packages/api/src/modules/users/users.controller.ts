@@ -38,8 +38,8 @@ export class UsersController {
   }
 
   @Get('me')
-  getProfile(@CurrentUser('sub') userId: string) {
-    return this.usersService.findById(userId);
+  async getProfile(@CurrentUser() user: { sub: string; isOwner?: boolean }) {
+    return { ...(await this.usersService.findById(user.sub)), isOwner: user.isOwner === true };
   }
 
   /** Anyone may edit their own name and phone. Declared before ':id'. */

@@ -36,7 +36,7 @@ export class FeatureGuard implements CanActivate {
     } catch {
       return true;
     }
-    if (!payload?.schoolId || payload.role === 'PLATFORM_SUPER_ADMIN') return true;
+    if (!payload?.schoolId) return true;
 
     if (!(await this.features.hasAccess(payload.schoolId, featureKey))) {
       throw new ForbiddenException({

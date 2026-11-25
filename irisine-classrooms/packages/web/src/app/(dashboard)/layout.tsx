@@ -80,7 +80,6 @@ import {
   ChevronRight,
   Menu,
   X,
-  Blocks,
 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -250,12 +249,12 @@ roleNavMap.FACULTY = roleNavMap.CLASS_TEACHER;
 
 const itAdminIcons: Record<string, typeof LayoutDashboard> = {
   '/it-admin': LayoutDashboard,
+  '/it-admin/schools': Building,
   '/users': Users,
   '/it-admin/faculty': Contact,
   '/students': GraduationCap,
-  '/it-admin/school': Building,
+  '/it-admin/school': Settings2,
   '/classes': LayoutGrid,
-  '/it-admin/modules': Blocks,
   '/settings': Settings2,
   '/account': UserCog,
 };
@@ -273,9 +272,9 @@ const navGroups: { name: string; items: string[] }[] = [
   { name: 'Settings', items: ['Settings', 'Reports', 'Bulk Operations', 'Compliance', 'Audit Logs'] },
 ];
 
-function getFilteredNav(role: string, schoolFeatures: string[] | null) {
+function getFilteredNav(role: string, schoolFeatures: string[] | null, isOwner: boolean) {
   if (role === 'IT_ADMIN') {
-    return itAdminItems(schoolFeatures).map((i) => ({ name: i.name, href: i.href, icon: itAdminIcons[i.href] }));
+    return itAdminItems(schoolFeatures, isOwner).map((i) => ({ name: i.name, href: i.href, icon: itAdminIcons[i.href] }));
   }
   // Feature flag (lib/features.ts) OFF wale items kisi ko bhi nahi dikhte,
   // aur jo module is school ko IT Admin ne diya hi nahi wo bhi nahi.
@@ -309,6 +308,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [isOwner, setIsOwner] = useState(false);
   const [userName, setUserName] = useState('');
   const [filteredNav, setFilteredNav] = useState(allNavigation);
   const [schoolFeatures, setSchoolFeatures] = useState<string[] | null>(null);
@@ -336,30 +336,13 @@ export default function DashboardLayout({
     authenticated &&
     (!isPathEnabled(pathname) ||
       (isItAdmin
-        ? !canItAdminOpen(pathname, schoolFeatures)
+        ? !canItAdminOpen(pathname, schoolFeatures, isOwner)
         : pathname.startsWith(IT_ADMIN_HOME) || !isFeatureAllowed(pathname, schoolFeatures)));
   const home = isItAdmin ? IT_ADMIN_HOME : '/dashboard';
 
   useEffect(() => {
     if (blocked) router.replace(home);
   }, [blocked, home, router]);
-
-  // Modules page ne koi switch badla to menu dobara banao
-  useEffect(() => {
-    async function refresh() {
-      try {
-        const res = await fetch('/api/v1/school/features', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` },
-        });
-        if (!res.ok) return;
-        const granted: string[] = (await res.json()).features;
-        setSchoolFeatures(granted);
-        setFilteredNav(getFilteredNav(userRole, granted));
-      } catch {}
-    }
-    window.addEventListener('school-features-changed', refresh);
-    return () => window.removeEventListener('school-features-changed', refresh);
-  }, [userRole]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -453,6 +436,7 @@ export default function DashboardLayout({
         const displayName = [freshUser.firstName, freshUser.lastName].filter(Boolean).join(' ') || freshUser.email || 'User';
 
         setUserRole(role);
+        setIsOwner(freshUser.isOwner === true);
         setUserName(displayName);
         // Modules granted to this school (the server enforces this too; this only tidies the menu)
         let granted: string[] | null = null;
@@ -461,7 +445,7 @@ export default function DashboardLayout({
           if (fr.ok) granted = (await fr.json()).features ?? null;
         } catch {}
         setSchoolFeatures(granted);
-        setFilteredNav(getFilteredNav(role, granted));
+        setFilteredNav(getFilteredNav(role, granted, freshUser.isOwner === true));
         setAuthenticated(true);
       } catch {
         // Network error — force re-login to be safe

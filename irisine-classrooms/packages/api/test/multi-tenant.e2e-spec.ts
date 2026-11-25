@@ -26,6 +26,7 @@ describe('Multi-tenant platform (e2e)', () => {
   const http = () => app.getHttpServer();
 
   let platformToken: string;
+  let homeSchoolId: string;
   const schools: Record<'A' | 'B', any> = { A: {}, B: {} };
 
   const tokenFromInvite = (to: string) => {
@@ -58,6 +59,7 @@ describe('Multi-tenant platform (e2e)', () => {
     request(http()).post(`${api}/auth/login`).send({ email, password, ...(portal && { portal }) });
 
   beforeAll(async () => {
+    process.env.PLATFORM_OWNER_EMAILS = PLATFORM_EMAIL;
     const mod = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(EmailService)
       .useValue({ sendEmail: async (to: string, _s: string, html: string) => void sent.push({ to, html }) })
@@ -70,14 +72,20 @@ describe('Multi-tenant platform (e2e)', () => {
     await app.init();
     prisma = app.get(PrismaService);
 
-    await prisma.platformAdmin.create({
-      data: { email: PLATFORM_EMAIL, passwordHash: await bcrypt.hash(PLATFORM_PASSWORD, 4), name: 'Owner' },
+    // the platform owner is the IT_ADMIN account; like every user it belongs to a school of its own
+    const home = await prisma.school.create({ data: { name: `${RUN} Owner`, code: `${RUN}-owner` } });
+    homeSchoolId = home.id;
+    await prisma.user.create({
+      data: {
+        email: PLATFORM_EMAIL, passwordHash: await bcrypt.hash(PLATFORM_PASSWORD, 4),
+        firstName: 'Owner', lastName: 'Test', role: 'IT_ADMIN', schoolId: home.id,
+      },
     });
   }, 60000);
 
   afterAll(async () => {
     // remove only what this run created
-    const ids = [schools.A.id, schools.B.id].filter(Boolean);
+    const ids = [schools.A.id, schools.B.id, homeSchoolId].filter(Boolean);
     try {
       const users = await prisma.user.findMany({ where: { schoolId: { in: ids } }, select: { id: true } });
       const uids = users.map((u) => u.id);
@@ -98,19 +106,17 @@ describe('Multi-tenant platform (e2e)', () => {
     } catch (e) {
       console.warn('cleanup incomplete:', (e as Error).message);
     }
-    await prisma.platformAdmin.deleteMany({ where: { email: PLATFORM_EMAIL } });
     await app.close();
   });
 
   // ─────────────────────────────────────────────────────────────
 
   describe('platform owner and onboarding', () => {
-    it('platform login works, a wrong password is rejected', async () => {
-      const bad = await request(http()).post(`${api}/platform-public/login`).send({ email: PLATFORM_EMAIL, password: 'nope-nope-nope' });
-      expect(bad.status).toBe(401);
-      const ok = await request(http()).post(`${api}/platform-public/login`).send({ email: PLATFORM_EMAIL, password: PLATFORM_PASSWORD });
+    it('the owner signs in through the IT Admin portal, a wrong password is rejected', async () => {
+      expect((await login(PLATFORM_EMAIL, 'nope-nope-nope', 'IT_ADMIN')).status).toBe(401);
+      const ok = await login(PLATFORM_EMAIL, PLATFORM_PASSWORD, 'IT_ADMIN');
       expect(ok.status).toBe(201);
-      expect(ok.body.user.role).toBe('PLATFORM_SUPER_ADMIN');
+      expect(ok.body.user).toMatchObject({ role: 'IT_ADMIN', portal: 'IT_ADMIN' });
       platformToken = ok.body.accessToken;
     });
 
@@ -118,9 +124,9 @@ describe('Multi-tenant platform (e2e)', () => {
       expect((await request(http()).get(`${api}/platform/schools`)).status).toBe(401);
     });
 
-    it('the platform owner login is marked as the platform, not a school portal', async () => {
-      const ok = await request(http()).post(`${api}/platform-public/login`).send({ email: PLATFORM_EMAIL, password: PLATFORM_PASSWORD });
-      expect(ok.body.user.portal).toBe('PLATFORM');
+    it('the separate platform login no longer exists', async () => {
+      const res = await request(http()).post(`${api}/platform-public/login`).send({ email: PLATFORM_EMAIL, password: PLATFORM_PASSWORD });
+      expect(res.status).toBe(404);
     });
 
     it('there is no public school registration any more', async () => {
@@ -168,7 +174,7 @@ describe('Multi-tenant platform (e2e)', () => {
       expect((await login(schools.A.email, 'School-Admin-Pass-1', 'SUPER_ADMIN')).status).toBe(201);
       expect((await login(schools.A.email, 'School-Admin-Pass-1', 'STUDENT')).status).toBe(403);
       expect((await login(schools.A.email, 'School-Admin-Pass-1', 'FACULTY')).status).toBe(403);
-      expect((await login(schools.A.email, 'School-Admin-Pass-1', 'IT_ADMIN')).status).toBe(403); // IT Admin = platform owner only
+      expect((await login(schools.A.email, 'School-Admin-Pass-1', 'IT_ADMIN')).status).toBe(403); // only the IT_ADMIN account uses that card
       expect((await login(schools.A.email, 'wrong-password')).status).toBe(401);
     });
 
@@ -190,9 +196,6 @@ describe('Multi-tenant platform (e2e)', () => {
       expect((await request(http()).get(`${api}/platform/stats`).set(platform())).body.schools).toBeGreaterThanOrEqual(2);
     });
 
-    it('a platform token cannot be used as a school user', async () => {
-      expect((await request(http()).get(`${api}/users`).set(platform())).status).toBe(403);
-    });
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -262,63 +265,50 @@ describe('Multi-tenant platform (e2e)', () => {
   // ─────────────────────────────────────────────────────────────
 
   describe('role-based access inside a school', () => {
-    let itToken: string;
-    let itEmail: string;
-    let adminUserId: string;
+    let staffToken: string;
+    const staffEmail = `${RUN}-coordinator@example.com`;
+    const base = { password: 'Some-Pass-12345', firstName: 'X', lastName: 'Y' };
 
-    it('the school Super Admin creates an IT Admin; schoolId in the body is ignored', async () => {
-      itEmail = `${RUN}-it@example.com`;
-      const res = await request(http()).post(`${api}/users`).set(auth(schools.A.token)).send({
-        email: itEmail, password: 'It-Admin-Pass-1', firstName: 'It', lastName: 'Admin', role: 'IT_ADMIN', schoolId: schools.B.id,
-      });
+    it('a school Super Admin creates staff; schoolId in the body is ignored', async () => {
+      const res = await request(http()).post(`${api}/users`).set(auth(schools.A.token))
+        .send({ ...base, email: staffEmail, role: 'ACADEMIC_COORDINATOR', schoolId: schools.B.id });
       expect(res.status).toBe(201);
-      const row = await prisma.user.findUnique({ where: { email: itEmail } });
-      expect(row!.schoolId).toBe(schools.A.id); // not school B
-      adminUserId = (await prisma.user.findFirst({ where: { schoolId: schools.A.id, role: 'SUPER_ADMIN' } }))!.id;
-      const l = await login(itEmail, 'It-Admin-Pass-1', 'IT_ADMIN'); // the school's own IT account
-      expect(l.status).toBe(201);
-      itToken = l.body.accessToken;
+      expect((await prisma.user.findUnique({ where: { email: staffEmail } }))!.schoolId).toBe(schools.A.id); // not school B
+      staffToken = (await login(staffEmail, base.password, 'FACULTY')).body.accessToken;
     });
 
-    it('an IT Admin cannot create admins or platform roles, or change an admin account', async () => {
-      const base = { password: 'Some-Pass-12345', firstName: 'X', lastName: 'Y' };
-      expect((await request(http()).post(`${api}/users`).set(auth(itToken)).send({ ...base, email: `${RUN}-x1@example.com`, role: 'SUPER_ADMIN' })).status).toBe(403);
-      expect((await request(http()).post(`${api}/users`).set(auth(itToken)).send({ ...base, email: `${RUN}-x2@example.com`, role: 'IT_ADMIN' })).status).toBe(403);
-      expect((await request(http()).post(`${api}/users`).set(auth(itToken)).send({ ...base, email: `${RUN}-x3@example.com`, role: 'PLATFORM_SUPER_ADMIN' })).status).toBe(400);
-      expect((await request(http()).patch(`${api}/users/${adminUserId}`).set(auth(itToken)).send({ isActive: false })).status).toBe(403);
+    it('a school can never create the owner (IT Admin) or a platform role', async () => {
+      const post = (role: string, n: number) =>
+        request(http()).post(`${api}/users`).set(auth(schools.A.token)).send({ ...base, email: `${RUN}-x${n}@example.com`, role });
+      expect((await post('IT_ADMIN', 1)).status).toBe(400);
+      expect((await post('PLATFORM_SUPER_ADMIN', 2)).status).toBe(400);
       expect(await prisma.user.count({ where: { email: { startsWith: `${RUN}-x` } } })).toBe(0);
     });
 
-    it('an IT Admin can create ordinary staff', async () => {
-      const res = await request(http()).post(`${api}/users`).set(auth(itToken)).send({
-        email: `${RUN}-teacher@example.com`, password: 'Teacher-Pass-123', firstName: 'T', lastName: 'One', role: 'CLASS_TEACHER',
-      });
-      expect(res.status).toBe(201);
+    it('only admins create accounts', async () => {
+      const res = await request(http()).post(`${api}/users`).set(auth(staffToken)).send({ ...base, email: `${RUN}-x3@example.com`, role: 'CLASS_TEACHER' });
+      expect(res.status).toBe(403);
     });
 
-    it('an IT Admin cannot switch a feature the platform did not allow, or one never granted', async () => {
-      const notManageable = await request(http()).patch(`${api}/school/features/ATTENDANCE`).set(auth(itToken)).send({ enabled: false });
+    it('a school admin cannot switch a feature the platform did not allow, or one never granted', async () => {
+      const notManageable = await request(http()).patch(`${api}/school/features/ATTENDANCE`).set(auth(schools.A.token)).send({ enabled: false });
       expect(notManageable.status).toBe(403);
-      const notGranted = await request(http()).patch(`${api}/school/features/LIBRARY`).set(auth(itToken)).send({ enabled: true });
+      const notGranted = await request(http()).patch(`${api}/school/features/LIBRARY`).set(auth(schools.A.token)).send({ enabled: true });
       expect(notGranted.status).toBe(403);
       expect((await request(http()).get(`${api}/students`).set(auth(schools.A.token))).status).toBe(200);
     });
 
-    it('once the platform allows it, the IT Admin can switch that feature (and only that)', async () => {
+    it('once the owner allows it, the school admin can switch that feature (and only that)', async () => {
       await request(http()).put(`${api}/platform/schools/${schools.A.id}/features`).set(platform())
         .send({ features: [{ key: 'FEES', enabled: true, adminManageable: true }] });
-      const off = await request(http()).patch(`${api}/school/features/FEES`).set(auth(itToken)).send({ enabled: false });
+      const off = await request(http()).patch(`${api}/school/features/FEES`).set(auth(schools.A.token)).send({ enabled: false });
       expect(off.status).toBe(200);
       expect((await request(http()).get(`${api}/fees/heads`).set(auth(schools.A.token))).status).toBe(403);
-      const on = await request(http()).patch(`${api}/school/features/FEES`).set(auth(itToken)).send({ enabled: true });
+      const on = await request(http()).patch(`${api}/school/features/FEES`).set(auth(schools.A.token)).send({ enabled: true });
       expect(on.status).toBe(200);
       expect((await request(http()).get(`${api}/fees/heads`).set(auth(schools.A.token))).status).toBe(200);
-      // the IT admin still cannot grant a feature the school never had
-      expect((await request(http()).patch(`${api}/school/features/LMS`).set(auth(itToken)).send({ enabled: true })).status).toBe(403);
-    });
-
-    it('an IT Admin cannot touch platform controls', async () => {
-      expect((await request(http()).get(`${api}/platform/schools`).set(auth(itToken))).status).toBe(403);
+      // still cannot grant a feature the school never had
+      expect((await request(http()).patch(`${api}/school/features/LMS`).set(auth(schools.A.token)).send({ enabled: true })).status).toBe(403);
     });
 
     it('previously open endpoints now require a login and a staff role', async () => {
@@ -328,9 +318,9 @@ describe('Multi-tenant platform (e2e)', () => {
     });
 
     it('a deactivated user is locked out at once', async () => {
-      await prisma.user.update({ where: { email: itEmail }, data: { isActive: false } });
-      expect((await request(http()).get(`${api}/users`).set(auth(itToken))).status).toBe(401);
-      await prisma.user.update({ where: { email: itEmail }, data: { isActive: true } });
+      await prisma.user.update({ where: { email: staffEmail }, data: { isActive: false } });
+      expect((await request(http()).get(`${api}/users/me`).set(auth(staffToken))).status).toBe(401);
+      await prisma.user.update({ where: { email: staffEmail }, data: { isActive: true } });
     });
   });
 

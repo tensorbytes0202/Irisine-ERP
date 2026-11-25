@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { CatalogFeature, FeaturePicker, FeatureSelection } from '@/components/feature-picker';
 
@@ -10,6 +10,8 @@ const input = 'w-full px-3 py-2 border rounded-md bg-background';
 
 export default function SchoolDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [ownSchool, setOwnSchool] = useState(false);
   const [school, setSchool] = useState<any>(null);
   const [usage, setUsage] = useState<any>(null);
   const [catalog, setCatalog] = useState<CatalogFeature[]>([]);
@@ -41,6 +43,27 @@ export default function SchoolDetailPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  // the school this account belongs to cannot be suspended or deleted (the API refuses it too)
+  useEffect(() => {
+    apiFetch('/users/me').then((me) => setOwnSchool(me.schoolId === id)).catch(() => {});
+  }, [id]);
+
+  async function remove() {
+    const typed = prompt(
+      `Delete "${school.name}"?\nNobody there will be able to sign in. Its records are kept and it can be restored.\n\nType the school name to confirm:`,
+    );
+    if (typed === null) return;
+    if (typed.trim() !== school.name.trim()) {
+      setError('The name did not match, so nothing was deleted.');
+      return;
+    }
+    try {
+      await apiFetch(`/platform/schools/${id}`, { method: 'DELETE' });
+      router.push('/it-admin/schools');
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   async function run(action: () => Promise<void>, ok: string) {
     setError('');
@@ -90,7 +113,7 @@ export default function SchoolDetailPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <Link href="/platform" className="text-sm text-primary hover:underline">&larr; Schools</Link>
+        <Link href="/it-admin/schools" className="text-sm text-primary hover:underline">&larr; Schools</Link>
         <h1 className="text-2xl font-bold mt-1">{school.name}</h1>
         <p className="text-sm text-muted-foreground">{[school.city, school.country, school.email].filter(Boolean).join(' · ')}</p>
       </div>
@@ -103,13 +126,17 @@ export default function SchoolDetailPage() {
           <h2 className="font-semibold">Status: {school.status}</h2>
           <div className="flex gap-2">
             {school.status !== 'ACTIVE' && (
-              <button onClick={() => setStatus('ACTIVE')} className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">Activate</button>
+              <button onClick={() => setStatus('ACTIVE')} className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">{school.status === 'DELETED' ? 'Restore' : 'Activate'}</button>
             )}
-            {school.status === 'ACTIVE' && (
+            {school.status === 'ACTIVE' && !ownSchool && (
               <button onClick={() => confirm('Suspend this school? Nobody there can sign in until you activate it again. Data is kept.') && setStatus('SUSPENDED')} className="rounded-md border px-3 py-1.5 text-sm">Suspend</button>
+            )}
+            {school.status !== 'DELETED' && !ownSchool && (
+              <button onClick={remove} className="rounded-md border border-destructive px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10">Delete school</button>
             )}
           </div>
         </div>
+        {ownSchool && <p className="text-sm text-muted-foreground">Your account belongs to this school, so it cannot be suspended or deleted.</p>}
         <button onClick={resend} className="text-sm text-primary hover:underline">Send a new set-password link to the Super Admin</button>
         {inviteLink && <div className="rounded-md border bg-muted p-3 text-sm break-all">{inviteLink}</div>}
       </section>

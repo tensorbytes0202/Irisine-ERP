@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PlatformOwnerGuard } from './platform-owner.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PlatformService } from './platform.service';
@@ -11,27 +11,13 @@ import { LimitsService } from './limits.service';
 import { SchoolProfileService } from './school-profile.service';
 import { UpdateSchoolProfileDto } from './dto/school-profile.dto';
 import { FeaturesService } from './features.service';
-import { CreateSchoolDto, PlatformLoginDto, SetFeaturesDto, SetLimitsDto, SetStatusDto, ToggleFeatureDto } from './dto/platform.dto';
+import { CreateSchoolDto, SetFeaturesDto, SetLimitsDto, SetStatusDto, ToggleFeatureDto } from './dto/platform.dto';
 
-/** Public: platform owner (IT Admin portal) login. There is no public school registration. */
-@ApiTags('Platform (public)')
-@UseGuards(ThrottlerGuard)
-@Controller('platform-public')
-export class PlatformPublicController {
-  constructor(private platform: PlatformService) {}
-
-  @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  login(@Body() dto: PlatformLoginDto) {
-    return this.platform.login(dto.email, dto.password);
-  }
-}
-
-/** Platform owner only. A school user (even a school SUPER_ADMIN) gets 403 here. */
+/** Platform owner only (see auth/platform-owner.ts). Everyone else, other IT admins included, gets 403. */
 @ApiTags('Platform')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('PLATFORM_SUPER_ADMIN')
+@UseGuards(JwtAuthGuard, RolesGuard, PlatformOwnerGuard)
+@Roles('IT_ADMIN')
 @Controller('platform')
 export class PlatformController {
   constructor(
@@ -55,8 +41,13 @@ export class PlatformController {
   @Get('schools/:id/usage') usage(@Param('id') id: string) { return this.limits.usage(id); }
 
   @Patch('schools/:id/status')
-  setStatus(@Param('id') id: string, @Body() dto: SetStatusDto) {
-    return this.platform.setSchoolStatus(id, dto.status);
+  setStatus(@Param('id') id: string, @Body() dto: SetStatusDto, @CurrentUser('schoolId') own: string) {
+    return this.platform.setSchoolStatus(id, dto.status, own);
+  }
+
+  @Delete('schools/:id')
+  deleteSchool(@Param('id') id: string, @CurrentUser('schoolId') own: string) {
+    return this.platform.deleteSchool(id, own);
   }
 
   @Patch('schools/:id/limits')

@@ -5,34 +5,38 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { LimitsService, FACULTY_ROLES } from '../platform/limits.service';
+import { ConfigService } from '@nestjs/config';
+import { isPlatformOwner } from '../auth/platform-owner';
 
-const PROTECTED_ROLES = ['SUPER_ADMIN', 'ADMIN', 'IT_ADMIN', 'DIRECTOR', 'PRINCIPAL'];
+const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'IT_ADMIN', 'DIRECTOR', 'PRINCIPAL'];
+/** Never handed out by any API: IT_ADMIN is set only in the database. */
+const UNGRANTABLE_ROLES = ['IT_ADMIN', 'PLATFORM_SUPER_ADMIN'];
+
+type Actor = { role: string; schoolId: string; isOwner?: boolean };
 
 @Injectable()
 export class UsersService {
   constructor(
     private prisma: PrismaService,
     private limits: LimitsService,
+    private config: ConfigService,
   ) {}
 
   /**
-   * Admin and leadership accounts belong to the school Super Admin alone. Without this an IT Admin
-   * could create a Director with a password of its choice and sign in with far more access.
+   * Admin and leadership accounts belong to the school Super Admin (or the platform owner).
+   * Without this an IT Admin could create a Director with a password of its choice and sign in
+   * with far more access.
    */
-  private isProtected(actorRole: string, targetRole: string) {
-    return actorRole !== 'SUPER_ADMIN' && PROTECTED_ROLES.includes(targetRole);
-  }
-
-  private assertCanGrant(actorRole: string, targetRole: string) {
-    if (targetRole === 'PLATFORM_SUPER_ADMIN') throw new ForbiddenException('This role cannot be granted here');
-    if (this.isProtected(actorRole, targetRole)) {
-      throw new ForbiddenException('Only the school Super Admin can create admin and leadership accounts');
+  private assertMayManage(actor: Actor, role: string) {
+    if (ADMIN_ROLES.includes(role) && actor.role !== 'SUPER_ADMIN' && !actor.isOwner) {
+      throw new ForbiddenException('Only the school Super Admin can manage admin and leadership accounts');
     }
   }
 
   /** The school always comes from the logged-in user, never from the request body. */
-  async create(dto: CreateUserDto, actor: { role: string; schoolId: string }) {
-    this.assertCanGrant(actor.role, dto.role);
+  async create(dto: CreateUserDto, actor: Actor) {
+    if (UNGRANTABLE_ROLES.includes(dto.role)) throw new ForbiddenException('This role cannot be granted here');
+    this.assertMayManage(actor, dto.role);
     if (FACULTY_ROLES.includes(dto.role)) await this.limits.assertCanAddFaculty(actor.schoolId);
     const email = dto.email.trim().toLowerCase();
     if (await this.prisma.user.findUnique({ where: { email } })) {
@@ -128,11 +132,13 @@ export class UsersService {
     return user;
   }
 
-  async update(id: string, dto: UpdateUserDto, actor: { sub: string; role: string; schoolId: string }) {
+  async update(id: string, dto: UpdateUserDto, actor: Actor & { sub: string }) {
     const target = await this.findInSchool(id, actor.schoolId);
-    if (this.isProtected(actor.role, target.role)) {
-      throw new ForbiddenException('Only the school Super Admin can change admin and leadership accounts');
+    // the owner account is changed by nobody here (it edits its own profile through /users/me)
+    if (isPlatformOwner(target, this.config.get<string>('PLATFORM_OWNER_EMAILS'))) {
+      throw new ForbiddenException('The platform owner account cannot be changed here');
     }
+    this.assertMayManage(actor, target.role);
     if (id === actor.sub && dto.isActive === false) {
       throw new ForbiddenException('You cannot deactivate your own account');
     }

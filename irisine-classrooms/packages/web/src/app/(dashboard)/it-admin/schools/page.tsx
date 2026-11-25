@@ -20,18 +20,23 @@ const statusClass: Record<string, string> = {
   ACTIVE: 'bg-accent text-accent-foreground',
   SUSPENDED: 'bg-yellow-100 text-yellow-800',
   DEACTIVATED: 'bg-destructive/10 text-destructive',
+  DELETED: 'bg-destructive/10 text-destructive',
 };
 
-export default function PlatformHome() {
+export default function SchoolsPage() {
   const [schools, setSchools] = useState<SchoolRow[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [error, setError] = useState('');
+  const [deleted, setDeleted] = useState(false);
 
   useEffect(() => {
-    Promise.all([apiFetch<SchoolRow[]>('/platform/schools'), apiFetch('/platform/stats')])
+    Promise.all([
+      apiFetch<SchoolRow[]>(`/platform/schools${deleted ? '?status=DELETED' : ''}`),
+      apiFetch('/platform/stats'),
+    ])
       .then(([s, st]) => { setSchools(s); setStats(st); })
       .catch((e) => setError(e.message));
-  }, []);
+  }, [deleted]);
 
   const cards = stats
     ? [
@@ -46,7 +51,7 @@ export default function PlatformHome() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Schools</h1>
-        <Link href="/platform/schools/new" className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+        <Link href="/it-admin/schools/new" className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
           <Plus className="h-4 w-4" /> Add school
         </Link>
       </div>
@@ -61,6 +66,11 @@ export default function PlatformHome() {
           </div>
         ))}
       </div>
+
+      <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <input type="checkbox" checked={deleted} onChange={(e) => setDeleted(e.target.checked)} />
+        Show deleted schools
+      </label>
 
       <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full text-sm">
@@ -88,12 +98,12 @@ export default function PlatformHome() {
                 <td className="px-3 py-2">{s.maxStudents ?? 'Unlimited'}</td>
                 <td className="px-3 py-2">{s.maxFaculty ?? 'Unlimited'}</td>
                 <td className="px-3 py-2 text-right">
-                  <Link href={`/platform/schools/${s.id}`} className="text-primary hover:underline">Manage</Link>
+                  <Link href={`/it-admin/schools/${s.id}`} className="text-primary hover:underline">Manage</Link>
                 </td>
               </tr>
             ))}
             {schools.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">No schools yet. Add the first one.</td></tr>
+              <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">{deleted ? 'No deleted schools.' : 'No schools yet. Add the first one.'}</td></tr>
             )}
           </tbody>
         </table>

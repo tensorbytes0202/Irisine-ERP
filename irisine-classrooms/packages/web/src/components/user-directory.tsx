@@ -19,7 +19,6 @@ const FACULTY = [
   'FACULTY', 'DIRECTOR', 'PRINCIPAL', 'ACADEMIC_COORDINATOR', 'CLASS_TEACHER', 'SUBJECT_TEACHER',
   'ACCOUNTANT', 'TRANSPORT_MANAGER', 'HOBBY_COORDINATOR',
 ];
-// Mirrors the API rule: only the school Super Admin creates or changes these.
 const PROTECTED = ['SUPER_ADMIN', 'ADMIN', 'IT_ADMIN', 'DIRECTOR', 'PRINCIPAL'];
 const STAFF_ROLES = ['CLASS_TEACHER', 'SUBJECT_TEACHER', 'ACADEMIC_COORDINATOR', 'ACCOUNTANT', 'TRANSPORT_MANAGER', 'HOBBY_COORDINATOR'];
 
@@ -29,7 +28,7 @@ const input = 'mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background fon
 
 export function UserDirectory({ facultyOnly = false }: { facultyOnly?: boolean }) {
   const [users, setUsers] = useState<User[]>([]);
-  const [me, setMe] = useState<{ id?: string; role?: string }>({});
+  const [me, setMe] = useState<{ id?: string; role?: string; isOwner?: boolean }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -55,10 +54,12 @@ export function UserDirectory({ facultyOnly = false }: { facultyOnly?: boolean }
   }, [load]);
 
   const canManage = me.role === 'SUPER_ADMIN' || me.role === 'IT_ADMIN';
+  // mirrors the API: admin and leadership accounts need the Super Admin or the platform owner
+  const leads = me.role === 'SUPER_ADMIN' || me.isOwner === true;
   const creatable = [
     ...STAFF_ROLES,
     ...(facultyOnly ? [] : ['PARENT']),
-    ...(me.role === 'SUPER_ADMIN' ? ['DIRECTOR', ...(facultyOnly ? [] : ['IT_ADMIN', 'SUPER_ADMIN'])] : []),
+    ...(leads ? ['DIRECTOR', ...(facultyOnly ? [] : ['SUPER_ADMIN'])] : []),
   ];
 
   async function create(e: React.FormEvent) {
@@ -180,7 +181,8 @@ export function UserDirectory({ facultyOnly = false }: { facultyOnly?: boolean }
             <tbody>
               {filtered.map((u) => {
                 const active = u.isActive !== false;
-                const editable = canManage && u.id !== me.id && (me.role === 'SUPER_ADMIN' || !PROTECTED.includes(u.role));
+                // the API additionally refuses any change to the platform owner account
+                const editable = canManage && u.id !== me.id && (leads || !PROTECTED.includes(u.role));
                 return (
                   <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="px-4 py-3 font-medium">{`${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || '--'}</td>

@@ -2645,7 +2645,7 @@ model AccountInvite {
   @@map("account_invites")
 }
 
-/// Platform owner accounts. Separate from school users: never created by signup.
+/// Unused: the platform owner is now the user with role IT_ADMIN. Kept so no table is dropped.
 model PlatformAdmin {
   id           String   @id @default(uuid())
   email        String   @unique

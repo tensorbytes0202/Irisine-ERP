@@ -41,11 +41,6 @@ export class SetStatusDto {
   @IsIn(['ACTIVE', 'SUSPENDED', 'DEACTIVATED']) status: string;
 }
 
-export class PlatformLoginDto {
-  @IsEmail() email: string;
-  @IsString() @MinLength(1) @MaxLength(100) password: string;
-}
-
 export class ToggleFeatureDto {
   @IsBoolean() enabled: boolean;
 }

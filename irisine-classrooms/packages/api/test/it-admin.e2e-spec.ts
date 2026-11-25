@@ -1,5 +1,5 @@
 /**
- * School-level IT_ADMIN: login, scope, tenant isolation and no privilege escalation.
+ * IT_ADMIN = the platform owner who also administers its own school: login, scope, schools and no escalation.
  * Runs the real Nest app against the LOCAL database (DATABASE_URL), creates its own data and removes it again.
  * Never point DATABASE_URL at production when running this.
  *
@@ -18,7 +18,7 @@ const RUN = `ita${Date.now()}`;
 const PASSWORD = 'Test-Pass-12345';
 const api = '/api/v1';
 
-describe('School IT Admin (e2e)', () => {
+describe('IT Admin, the platform owner (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   const http = () => app.getHttpServer();
@@ -58,6 +58,7 @@ describe('School IT Admin (e2e)', () => {
   }
 
   beforeAll(async () => {
+    process.env.PLATFORM_OWNER_EMAILS = email('it'); // only this IT_ADMIN owns the platform
     const mod = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(EmailService)
       .useValue({ sendEmail: async () => undefined })
@@ -74,6 +75,8 @@ describe('School IT Admin (e2e)', () => {
     await makeSchool('B');
     await makeUser('it', 'IT_ADMIN', 'A');
     await makeUser('itoff', 'IT_ADMIN', 'A', false);
+    // an IT_ADMIN a school created before the role meant anything more than school IT
+    await makeUser('legacy', 'IT_ADMIN', 'B');
     await makeUser('super', 'SUPER_ADMIN', 'A');
     await makeUser('director', 'DIRECTOR', 'A');
     await makeUser('teacher', 'CLASS_TEACHER', 'A');
@@ -142,9 +145,9 @@ describe('School IT Admin (e2e)', () => {
       expect(res.body.user.portal).toBe(portal);
     });
 
-    it('a school IT Admin is not a platform admin', async () => {
+    it('there is no separate platform login any more', async () => {
       const res = await request(http()).post(`${api}/platform-public/login`).send({ email: email('it'), password: PASSWORD });
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(404);
     });
 
     it('refresh is refused once the account is inactive', async () => {
@@ -165,32 +168,36 @@ describe('School IT Admin (e2e)', () => {
   // ── scope ────────────────────────────────────────────────────────
 
   describe('what an IT Admin may reach', () => {
-    it.each(['/users/me', '/users', '/students', '/classes', '/classes/detailed', '/academic-sessions', '/settings', '/school/features', '/school/profile', '/school/modules'])(
+    it.each(['/users/me', '/users', '/students', '/classes', '/classes/detailed', '/academic-sessions', '/settings', '/school/features', '/school/profile', '/school/modules', '/platform/schools', '/platform/stats', '/platform/features'])(
       'may open %s',
       async (path) => {
         expect((await request(http()).get(`${api}${path}`).set(auth(it_))).status).toBe(200);
       },
     );
 
-    it.each(['/platform/schools', '/platform/stats', '/fees/heads', '/payroll', '/audit/logs', '/dashboard/stats', '/search?q=a'])(
+    it.each(['/fees/heads', '/payroll', '/audit/logs', '/dashboard/stats', '/search?q=a'])(
       'may NOT open %s',
       async (path) => {
         expect((await request(http()).get(`${api}${path}`).set(auth(it_))).status).toBe(403);
       },
     );
 
-    it('cannot use platform controls to create schools or grant modules', async () => {
-      expect((await request(http()).post(`${api}/platform/schools`).set(auth(it_)).send({})).status).toBe(403);
-      expect(
-        (await request(http()).put(`${api}/platform/schools/${schools.A.id}/features`).set(auth(it_)).send({ features: [{ key: 'LIBRARY', enabled: true }] })).status,
-      ).toBe(403);
-      expect((await request(http()).patch(`${api}/school/features/LIBRARY`).set(auth(it_)).send({ enabled: true })).status).toBe(403);
+    it('no school account can use the owner controls', async () => {
+      for (const name of ['super', 'teacher', 'student', 'bsuper']) {
+        const t = (await login(name)).body.accessToken;
+        expect((await request(http()).get(`${api}/platform/schools`).set(auth(t))).status).toBe(403);
+        expect((await request(http()).delete(`${api}/platform/schools/${schools.B.id}`).set(auth(t))).status).toBe(403);
+        expect(
+          (await request(http()).put(`${api}/platform/schools/${schools.A.id}/features`).set(auth(t)).send({ features: [{ key: 'LIBRARY', enabled: true }] })).status,
+        ).toBe(403);
+      }
+      expect((await prisma.school.findUnique({ where: { id: schools.B.id } }))!.status).toBe('ACTIVE');
     });
 
     it('a forged token (role edited by the client) is rejected', async () => {
       const [h, p, s] = it_.split('.');
       const body = JSON.parse(Buffer.from(p, 'base64url').toString());
-      const forged = [h, Buffer.from(JSON.stringify({ ...body, role: 'PLATFORM_SUPER_ADMIN' })).toString('base64url'), s].join('.');
+      const forged = [h, Buffer.from(JSON.stringify({ ...body, sub: users.bsuper })).toString('base64url'), s].join('.');
       expect((await request(http()).get(`${api}/platform/schools`).set(auth(forged))).status).toBe(401);
       expect((await request(http()).get(`${api}/users`)).status).toBe(401);
     });
@@ -222,18 +229,35 @@ describe('School IT Admin (e2e)', () => {
   describe('user management without escalation', () => {
     const body = { password: PASSWORD, firstName: 'New', lastName: 'Person' };
 
-    it.each(['SUPER_ADMIN', 'IT_ADMIN', 'DIRECTOR'])('cannot create a %s account', async (role) => {
-      const res = await request(http()).post(`${api}/users`).set(auth(it_)).send({ ...body, email: email(`esc-${role}`), role });
-      expect(res.status).toBe(403);
+    it.each(['IT_ADMIN', 'PLATFORM_SUPER_ADMIN'])('nobody can create a %s account from the website', async (role) => {
+      const superToken = (await login('super')).body.accessToken;
+      for (const t of [it_, superToken]) {
+        const res = await request(http()).post(`${api}/users`).set(auth(t)).send({ ...body, email: email(`esc-${role}`), role });
+        expect(res.status).toBe(400);
+      }
+      expect(await prisma.user.count({ where: { email: email(`esc-${role}`) } })).toBe(0);
     });
 
-    it('cannot change a leadership account, its own role, or its school', async () => {
-      expect((await request(http()).patch(`${api}/users/${users.director}`).set(auth(it_)).send({ isActive: false })).status).toBe(403);
-      expect((await request(http()).patch(`${api}/users/${users.super}`).set(auth(it_)).send({ isActive: false })).status).toBe(403);
+    it('a school Super Admin cannot deactivate or rename the owner account', async () => {
+      const superToken = (await login('super')).body.accessToken;
+      for (const change of [{ isActive: false }, { firstName: 'Taken' }]) {
+        expect((await request(http()).patch(`${api}/users/${users.it}`).set(auth(superToken)).send(change)).status).toBe(403);
+      }
+      expect((await prisma.user.findUnique({ where: { id: users.it } }))!.isActive).toBe(true);
+    });
+
+    it('the owner manages leadership accounts of its own school', async () => {
+      const created = await request(http()).post(`${api}/users`).set(auth(it_)).send({ ...body, email: email('boss'), role: 'SUPER_ADMIN' });
+      expect(created.status).toBe(201);
+      expect((await request(http()).patch(`${api}/users/${users.director}`).set(auth(it_)).send({ firstName: 'Dir' })).status).toBe(200);
+    });
+
+    it('cannot change its own role or school', async () => {
       expect((await request(http()).patch(`${api}/users/me`).set(auth(it_)).send({ role: 'SUPER_ADMIN' })).status).toBe(400);
       expect((await request(http()).patch(`${api}/users/me`).set(auth(it_)).send({ schoolId: schools.B.id })).status).toBe(400);
+      expect((await request(http()).patch(`${api}/users/${users.it}`).set(auth(it_)).send({ isActive: false })).status).toBe(403);
       const me = await prisma.user.findUnique({ where: { id: users.it } });
-      expect(me).toMatchObject({ role: 'IT_ADMIN', schoolId: schools.A.id });
+      expect(me).toMatchObject({ role: 'IT_ADMIN', schoolId: schools.A.id, isActive: true });
     });
 
     it('can edit its own name and phone', async () => {
@@ -340,6 +364,108 @@ describe('School IT Admin (e2e)', () => {
       const bad = await request(http()).post(`${api}/academic-sessions`).set(auth(it_))
         .send({ name: 'bad', startDate: '2028-04-01', endDate: '2027-03-31' });
       expect(bad.status).toBe(400);
+    });
+  });
+  // ── an IT_ADMIN that is not the owner ────────────────────────────
+
+  describe('an IT_ADMIN account that is not listed as owner', () => {
+    let t: string;
+    beforeAll(async () => {
+      t = (await login('legacy', PASSWORD, 'IT_ADMIN')).body.accessToken;
+    });
+
+    it('is told apart from the owner', async () => {
+      expect((await request(http()).get(`${api}/users/me`).set(auth(t))).body.isOwner).toBe(false);
+      expect((await request(http()).get(`${api}/users/me`).set(auth(it_))).body.isOwner).toBe(true);
+    });
+
+    it.each(['/platform/schools', '/platform/stats', '/platform/features'])('cannot open %s', async (path) => {
+      expect((await request(http()).get(`${api}${path}`).set(auth(t))).status).toBe(403);
+    });
+
+    it('cannot create, change or delete schools', async () => {
+      const a = `${api}/platform/schools/${schools.A.id}`;
+      expect((await request(http()).post(`${api}/platform/schools`).set(auth(t)).send({})).status).toBe(403);
+      expect((await request(http()).delete(a).set(auth(t))).status).toBe(403);
+      expect((await request(http()).patch(`${a}/limits`).set(auth(t)).send({ maxStudents: 1 })).status).toBe(403);
+      expect((await request(http()).put(`${a}/features`).set(auth(t)).send({ features: [{ key: 'LIBRARY', enabled: true }] })).status).toBe(403);
+      expect((await prisma.school.findUnique({ where: { id: schools.A.id } }))!.status).toBe('ACTIVE');
+    });
+
+    it('cannot create or change admin and leadership accounts', async () => {
+      for (const role of ['SUPER_ADMIN', 'DIRECTOR']) {
+        const res = await request(http()).post(`${api}/users`).set(auth(t))
+          .send({ email: email(`legacy-${role}`), password: PASSWORD, firstName: 'X', lastName: 'Y', role });
+        expect(res.status).toBe(403);
+      }
+      expect((await request(http()).patch(`${api}/users/${users.bsuper}`).set(auth(t)).send({ isActive: false })).status).toBe(403);
+    });
+
+    it("can be deactivated by its school's Super Admin", async () => {
+      const bsuper = (await login('bsuper')).body.accessToken;
+      expect((await request(http()).patch(`${api}/users/${users.legacy}`).set(auth(bsuper)).send({ isActive: false })).status).toBe(200);
+      expect((await request(http()).get(`${api}/users`).set(auth(t))).status).toBe(401);
+      await prisma.user.update({ where: { id: users.legacy }, data: { isActive: true } });
+    });
+  });
+
+  // ── schools: add, grant, delete, restore ─────────────────────────
+
+  describe('the owner runs the schools', () => {
+    let created: string;
+
+    afterAll(async () => {
+      if (created) schools['C' as 'A'] = { id: created } as any; // removed by the global cleanup
+    });
+
+    it('adds a school with limits and chosen modules', async () => {
+      const res = await request(http()).post(`${api}/platform/schools`).set(auth(it_)).send({
+        schoolName: `${RUN} New`, adminName: 'Asha Rao', adminEmail: email('newadmin'), maxStudents: 100,
+        features: [{ key: 'ATTENDANCE', enabled: true }],
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.inviteLink).toContain('/accept-invite?token=');
+      created = res.body.schoolId;
+      const list = await request(http()).get(`${api}/platform/schools`).set(auth(it_));
+      expect(list.body.map((s: any) => s.id)).toContain(created);
+    });
+
+    it('grants modules to a school', async () => {
+      const res = await request(http()).put(`${api}/platform/schools/${schools.B.id}/features`).set(auth(it_))
+        .send({ features: [{ key: 'LIBRARY', enabled: true }] });
+      expect(res.status).toBe(200);
+      expect(res.body.map((f: any) => f.featureKey)).toContain('LIBRARY');
+    });
+
+    it('deletes a school: hidden from the list, its users locked out, its data kept', async () => {
+      const bToken = (await login('bsuper')).body.accessToken;
+      const res = await request(http()).delete(`${api}/platform/schools/${schools.B.id}`).set(auth(it_));
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('DELETED');
+      const ids = async (query = '') => (await request(http()).get(`${api}/platform/schools${query}`).set(auth(it_))).body.map((s: any) => s.id);
+      expect(await ids()).not.toContain(schools.B.id);
+      expect(await ids('?status=DELETED')).toContain(schools.B.id);
+      expect((await login('bsuper')).status).toBe(403);
+      expect([401, 403]).toContain((await request(http()).get(`${api}/users`).set(auth(bToken))).status);
+      expect(await prisma.class.count({ where: { schoolId: schools.B.id } })).toBeGreaterThan(0);
+      expect(await prisma.user.count({ where: { schoolId: schools.B.id } })).toBeGreaterThan(0);
+    });
+
+    it('restores a deleted school', async () => {
+      const res = await request(http()).patch(`${api}/platform/schools/${schools.B.id}/status`).set(auth(it_)).send({ status: 'ACTIVE' });
+      expect(res.status).toBe(200);
+      expect((await login('bsuper')).status).toBe(201);
+    });
+
+    it('cannot delete or suspend the school its own account belongs to', async () => {
+      expect((await request(http()).delete(`${api}/platform/schools/${schools.A.id}`).set(auth(it_))).status).toBe(403);
+      expect((await request(http()).patch(`${api}/platform/schools/${schools.A.id}/status`).set(auth(it_)).send({ status: 'SUSPENDED' })).status).toBe(403);
+      expect((await prisma.school.findUnique({ where: { id: schools.A.id } }))!.status).toBe('ACTIVE');
+    });
+
+    it('a status change cannot be used to delete, and an unknown school is 404', async () => {
+      expect((await request(http()).patch(`${api}/platform/schools/${schools.B.id}/status`).set(auth(it_)).send({ status: 'DELETED' })).status).toBe(400);
+      expect((await request(http()).delete(`${api}/platform/schools/nope`).set(auth(it_))).status).toBe(404);
     });
   });
 });

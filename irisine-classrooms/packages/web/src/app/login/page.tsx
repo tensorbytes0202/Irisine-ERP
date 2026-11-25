@@ -12,7 +12,7 @@ const PORTALS: { key: PortalKey; title: string; hint: string; icon: any }[] = [
   { key: 'STUDENT', title: 'Student', hint: 'Timetable, homework, fees, live classes', icon: GraduationCap },
   { key: 'FACULTY', title: 'Faculty', hint: 'Attendance, grading, assignments, classes', icon: Presentation },
   { key: 'SUPER_ADMIN', title: 'Super Admin', hint: 'Run your school: students, staff, fees', icon: School },
-  { key: 'IT_ADMIN', title: 'IT Admin', hint: 'Users, school setup and settings', icon: ServerCog },
+  { key: 'IT_ADMIN', title: 'IT Admin', hint: 'Schools, features, users and settings', icon: ServerCog },
 ];
 
 export default function LoginPage() {

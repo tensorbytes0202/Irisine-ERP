@@ -44,7 +44,7 @@ export async function apiFetch<T = any>(path: string, init: RequestInit = {}): P
   if (res.status === 401) {
     clearSession();
     if (typeof window !== 'undefined') {
-      window.location.href = window.location.pathname.startsWith('/platform') ? '/platform-login' : '/login';
+      window.location.href = '/login';
     }
   }
   if (!res.ok) {

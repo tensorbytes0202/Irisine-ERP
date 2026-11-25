@@ -63,8 +63,8 @@ export default function NewSchoolPage() {
         <p className="text-xs text-muted-foreground">The link works once and expires in 72 hours. You can send a new one from the school page.</p>
         <div className="flex gap-3">
           <button onClick={() => navigator.clipboard?.writeText(done.inviteLink)} className="rounded-md border px-3 py-2 text-sm">Copy link</button>
-          <Link href={`/platform/schools/${done.schoolId}`} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">Open school</Link>
-          <Link href="/platform" className="px-3 py-2 text-sm text-primary">Back to schools</Link>
+          <Link href={`/it-admin/schools/${done.schoolId}`} className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">Open school</Link>
+          <Link href="/it-admin/schools" className="px-3 py-2 text-sm text-primary">Back to schools</Link>
         </div>
       </div>
     );
@@ -80,7 +80,7 @@ export default function NewSchoolPage() {
   return (
     <form onSubmit={submit} className="max-w-3xl space-y-6">
       <div>
-        <Link href="/platform" className="text-sm text-primary hover:underline">&larr; Schools</Link>
+        <Link href="/it-admin/schools" className="text-sm text-primary hover:underline">&larr; Schools</Link>
         <h1 className="text-2xl font-bold mt-1">Add a school</h1>
       </div>
 
