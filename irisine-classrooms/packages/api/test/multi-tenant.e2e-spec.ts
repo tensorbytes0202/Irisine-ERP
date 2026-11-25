@@ -37,26 +37,22 @@ describe('Multi-tenant platform (e2e)', () => {
   const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
   const platform = () => auth(platformToken);
 
-  async function register(name: string, email: string) {
-    return request(http()).post(`${api}/platform-public/school-registrations`).send({
-      schoolName: name, email, phone: '+911234567890', address: '1 Main Road', city: 'Pune', state: 'MH',
-      country: 'India', contactPerson: 'Asha Rao',
-    });
-  }
-  async function onboard(key: 'A' | 'B', features: string[]) {
+  async function onboard(key: 'A' | 'B', features: string[], limits: { maxStudents?: number; maxFaculty?: number } = {}) {
     const email = `${RUN}-${key.toLowerCase()}-admin@example.com`;
-    const reg = await register(`${RUN} School ${key}`, email);
-    expect(reg.status).toBe(201);
-    const approve = await request(http())
-      .post(`${api}/platform/registrations/${reg.body.id}/approve`)
+    const create = await request(http())
+      .post(`${api}/platform/schools`)
       .set(platform())
-      .send({ features: features.map((k) => ({ key: k, enabled: true })) });
-    expect(approve.status).toBe(201);
+      .send({
+        schoolName: `${RUN} School ${key}`, adminName: 'Asha Rao', adminEmail: email, city: 'Pune', country: 'India',
+        ...limits, features: features.map((k) => ({ key: k, enabled: true })),
+      });
+    expect(create.status).toBe(201);
+    expect(create.body.inviteLink).toContain('/accept-invite?token=');
     const accept = await request(http())
       .post(`${api}/auth/accept-invite`)
       .send({ token: tokenFromInvite(email), password: 'School-Admin-Pass-1' });
     expect(accept.status).toBe(201);
-    schools[key] = { id: approve.body.schoolId, email, token: accept.body.accessToken, requestId: reg.body.id };
+    schools[key] = { id: create.body.schoolId, email, token: accept.body.accessToken };
   }
   const login = (email: string, password: string, portal?: string) =>
     request(http()).post(`${api}/auth/login`).send({ email, password, ...(portal && { portal }) });
@@ -102,7 +98,6 @@ describe('Multi-tenant platform (e2e)', () => {
     } catch (e) {
       console.warn('cleanup incomplete:', (e as Error).message);
     }
-    await prisma.schoolRegistrationRequest.deleteMany({ where: { email: { startsWith: RUN } } });
     await prisma.platformAdmin.deleteMany({ where: { email: PLATFORM_EMAIL } });
     await app.close();
   });
@@ -123,43 +118,44 @@ describe('Multi-tenant platform (e2e)', () => {
       expect((await request(http()).get(`${api}/platform/schools`)).status).toBe(401);
     });
 
-    it('a registration request creates NO school and NO user', async () => {
-      const email = `${RUN}-pending@example.com`;
-      const res = await register(`${RUN} Pending`, email);
-      expect(res.status).toBe(201);
-      expect(res.body.status).toBe('PENDING');
-      expect(await prisma.user.count({ where: { email } })).toBe(0);
-      expect(await prisma.school.count({ where: { name: `${RUN} Pending` } })).toBe(0);
-      expect((await register(`${RUN} Pending`, email)).status).toBe(409); // already pending
+    it('the platform owner signs in through the IT Admin portal', async () => {
+      const ok = await request(http()).post(`${api}/platform-public/login`).send({ email: PLATFORM_EMAIL, password: PLATFORM_PASSWORD });
+      expect(ok.body.user.portal).toBe('IT_ADMIN');
     });
 
-    it('rejects an invalid registration', async () => {
+    it('there is no public school registration any more', async () => {
       const res = await request(http()).post(`${api}/platform-public/school-registrations`).send({ schoolName: 'x' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(404);
+      expect((await request(http()).post(`${api}/auth/register`).send({ email: 'a@b.co', password: 'x' })).status).toBe(404);
     });
 
-    it('approval needs at least one feature and a valid key', async () => {
-      const email = `${RUN}-nofeat@example.com`;
-      const reg = await register(`${RUN} NoFeat`, email);
-      const empty = await request(http()).post(`${api}/platform/registrations/${reg.body.id}/approve`).set(platform()).send({ features: [] });
-      expect(empty.status).toBe(400);
-      const bad = await request(http()).post(`${api}/platform/registrations/${reg.body.id}/approve`).set(platform())
-        .send({ features: [{ key: 'MADE_UP', enabled: true }] });
-      expect(bad.status).toBe(400);
-      const rej = await request(http()).post(`${api}/platform/registrations/${reg.body.id}/reject`).set(platform()).send({ reason: 'not a school' });
-      expect(rej.status).toBe(201);
-      expect((await request(http()).post(`${api}/platform/registrations/${reg.body.id}/approve`).set(platform())
-        .send({ features: [{ key: 'ATTENDANCE', enabled: true }] })).status).toBe(400); // already reviewed
+    it('creating a school validates its input', async () => {
+      const base = { schoolName: `${RUN} Bad`, adminName: 'Asha Rao', adminEmail: `${RUN}-bad@example.com` };
+      const post = (body: any, token = platform()) => request(http()).post(`${api}/platform/schools`).set(token).send(body);
+      expect((await post({ ...base, features: [] })).status).toBe(400); // needs a feature
+      expect((await post({ ...base, features: [{ key: 'MADE_UP', enabled: true }] })).status).toBe(400);
+      expect((await post({ ...base, features: [{ key: 'CORE', enabled: true }] })).status).toBe(400);
+      expect((await post({ ...base, maxStudents: -5, features: [{ key: 'ATTENDANCE', enabled: true }] })).status).toBe(400);
+      expect(await prisma.school.count({ where: { name: `${RUN} Bad` } })).toBe(0); // nothing half-created
     });
 
-    it('approves two schools with DIFFERENT features (nothing hardcoded)', async () => {
-      await onboard('A', ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'FEES']);
+    it('only the platform owner can create a school, and the admin email must be new', async () => {
+      await onboard('A', ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'FEES'], { maxFaculty: 5 });
       await onboard('B', ['STUDENT_MANAGEMENT', 'ATTENDANCE']);
+      const body = { schoolName: `${RUN} Dup`, adminName: 'X Y', adminEmail: schools.A.email, features: [{ key: 'ATTENDANCE', enabled: true }] };
+      expect((await request(http()).post(`${api}/platform/schools`).set(platform()).send(body)).status).toBe(409);
+      expect((await request(http()).post(`${api}/platform/schools`).set(auth(schools.A.token)).send({ ...body, adminEmail: `${RUN}-z@example.com` })).status).toBe(403);
+    });
+
+    it('two schools get DIFFERENT features and limits (nothing hardcoded)', async () => {
       const a = await prisma.schoolFeature.findMany({ where: { schoolId: schools.A.id } });
       const b = await prisma.schoolFeature.findMany({ where: { schoolId: schools.B.id } });
       expect(a.map((f) => f.featureKey).sort()).toEqual(['ATTENDANCE', 'FEES', 'STUDENT_MANAGEMENT']);
       expect(b.map((f) => f.featureKey).sort()).toEqual(['ATTENDANCE', 'STUDENT_MANAGEMENT']);
-      expect((await prisma.school.findUnique({ where: { id: schools.A.id } }))!.status).toBe('ACTIVE');
+      const sa = await prisma.school.findUnique({ where: { id: schools.A.id } });
+      const sb = await prisma.school.findUnique({ where: { id: schools.B.id } });
+      expect(sa!.status).toBe('ACTIVE');
+      expect([sa!.maxFaculty, sb!.maxFaculty]).toEqual([5, null]);
     });
 
     it('the invite link works once only', async () => {
@@ -172,11 +168,12 @@ describe('Multi-tenant platform (e2e)', () => {
       expect((await login(schools.A.email, 'School-Admin-Pass-1', 'SUPER_ADMIN')).status).toBe(201);
       expect((await login(schools.A.email, 'School-Admin-Pass-1', 'STUDENT')).status).toBe(403);
       expect((await login(schools.A.email, 'School-Admin-Pass-1', 'FACULTY')).status).toBe(403);
+      expect((await login(schools.A.email, 'School-Admin-Pass-1', 'IT_ADMIN')).status).toBe(403); // IT Admin = platform owner only
       expect((await login(schools.A.email, 'wrong-password')).status).toBe(401);
     });
 
     it('a school Super Admin cannot use platform controls', async () => {
-      for (const path of ['/platform/schools', '/platform/stats', '/platform/registrations', '/platform/features']) {
+      for (const path of ['/platform/schools', '/platform/stats', '/platform/features']) {
         expect((await request(http()).get(`${api}${path}`).set(auth(schools.A.token))).status).toBe(403);
       }
       const put = await request(http()).put(`${api}/platform/schools/${schools.A.id}/features`).set(auth(schools.A.token))
@@ -219,6 +216,7 @@ describe('Multi-tenant platform (e2e)', () => {
       const a = await request(http()).get(`${api}/school/features`).set(auth(schools.A.token));
       expect(a.body.features).toEqual(expect.arrayContaining(['CORE', 'FEES', 'ATTENDANCE']));
       expect(a.body.features).not.toContain('LIBRARY');
+      expect(a.body.limits).toMatchObject({ maxFaculty: 5, maxStudents: null });
     });
 
     it('removing a feature blocks its API but keeps the data; re-enabling restores it', async () => {
@@ -277,7 +275,7 @@ describe('Multi-tenant platform (e2e)', () => {
       const row = await prisma.user.findUnique({ where: { email: itEmail } });
       expect(row!.schoolId).toBe(schools.A.id); // not school B
       adminUserId = (await prisma.user.findFirst({ where: { schoolId: schools.A.id, role: 'SUPER_ADMIN' } }))!.id;
-      const l = await login(itEmail, 'It-Admin-Pass-1', 'IT_ADMIN');
+      const l = await login(itEmail, 'It-Admin-Pass-1', 'SUPER_ADMIN'); // a school-level IT account lives in the school admin portal
       expect(l.status).toBe(201);
       itToken = l.body.accessToken;
     });
@@ -411,6 +409,41 @@ describe('Multi-tenant platform (e2e)', () => {
       expect(await prisma.payment.count({ where: { receiptNo: `${RUN}-R1` } })).toBe(0);
     });
 
+    it('the student limit is enforced by the backend', async () => {
+      const set = (v: number | null) => request(http()).patch(`${api}/platform/schools/${schools.A.id}/limits`).set(platform()).send({ maxStudents: v });
+      expect((await set(2)).status).toBe(200); // A already has 2 students
+      const blocked = await request(http()).post(`${api}/students`).set(auth(schools.A.token)).send(studentBody(3));
+      expect(blocked.status).toBe(403);
+      expect(blocked.body.code).toBe('LIMIT_REACHED');
+      expect(await prisma.student.count({ where: { admissionNo: `${RUN}-ADM3` } })).toBe(0);
+      const bulk = await request(http()).post(`${api}/bulk/import/students`).set(auth(schools.A.token))
+        .send({ students: [{ admissionNo: `${RUN}-B1`, firstName: 'B', lastName: 'One', email: `${RUN}-bulk1@example.com`, classGrade: '1', sectionName: 'A', dateOfBirth: '2015-01-01', gender: 'MALE' }] });
+      expect(bulk.status).toBe(403); // bulk is a REPORTS feature that school A does not have
+      expect((await set(3)).status).toBe(200);
+      expect((await request(http()).post(`${api}/students`).set(auth(schools.A.token)).send(studentBody(3))).status).toBe(201);
+      expect((await request(http()).post(`${api}/students`).set(auth(schools.A.token)).send(studentBody(4))).status).toBe(403);
+      expect((await set(null)).status).toBe(200); // unlimited again
+      expect((await request(http()).post(`${api}/students`).set(auth(schools.A.token)).send(studentBody(4))).status).toBe(201);
+    });
+
+    it('the faculty limit is enforced, and a school admin cannot change its own limits', async () => {
+      const mk = (n: number) => request(http()).post(`${api}/users`).set(auth(schools.A.token)).send({
+        email: `${RUN}-fac${n}@example.com`, password: 'Teacher-Pass-123', firstName: 'F', lastName: `${n}`, role: 'SUBJECT_TEACHER',
+      });
+      const own = await request(http()).patch(`${api}/platform/schools/${schools.A.id}/limits`).set(auth(schools.A.token)).send({ maxFaculty: 999 });
+      expect(own.status).toBe(403);
+      await request(http()).patch(`${api}/platform/schools/${schools.A.id}/limits`).set(platform()).send({ maxFaculty: 2 });
+      expect((await mk(1)).status).toBe(201); // the class teacher made earlier + this one = 2 of 2
+      const over = await mk(2);
+      expect(over.status).toBe(403);
+      expect(over.body.code).toBe('LIMIT_REACHED');
+      await request(http()).patch(`${api}/platform/schools/${schools.A.id}/limits`).set(platform()).send({ maxFaculty: null });
+      expect((await mk(2)).status).toBe(201);
+      // non-faculty roles do not use up the faculty limit
+      const usage = await request(http()).get(`${api}/platform/schools/${schools.A.id}/usage`).set(platform());
+      expect(usage.body.faculty).toBe(3);
+    });
+
     it('a student sees only their own records, never a classmate\'s', async () => {
       const email = `${RUN}-stu1@example.com`;
       const acc = await request(http()).post(`${api}/auth/accept-invite`).send({ token: tokenFromInvite(email), password: 'Student-Pass-123' });
@@ -423,7 +456,7 @@ describe('Multi-tenant platform (e2e)', () => {
       expect((await request(http()).get(`${api}/fees/payments/${aStudent2.id}`).set(auth(t))).status).toBe(403);
       expect((await request(http()).get(`${api}/students`).set(auth(t))).status).toBe(403); // roster is staff only
       expect((await request(http()).get(`${api}/grace-marks`).set(auth(t))).status).toBe(403);
-      expect((await login(email, 'Student-Pass-123', 'IT_ADMIN')).status).toBe(403);
+      expect((await login(email, 'Student-Pass-123', 'FACULTY')).status).toBe(403);
       expect((await login(email, 'Student-Pass-123', 'STUDENT')).status).toBe(201);
     });
   });

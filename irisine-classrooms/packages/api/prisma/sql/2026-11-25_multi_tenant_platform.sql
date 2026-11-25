@@ -10,7 +10,9 @@ ALTER TABLE `schools`
   ADD COLUMN IF NOT EXISTS `state` VARCHAR(191) NULL,
   ADD COLUMN IF NOT EXISTS `country` VARCHAR(191) NULL,
   ADD COLUMN IF NOT EXISTS `website` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `status` VARCHAR(191) NOT NULL DEFAULT 'ACTIVE';
+  ADD COLUMN IF NOT EXISTS `status` VARCHAR(191) NOT NULL DEFAULT 'ACTIVE',
+  ADD COLUMN IF NOT EXISTS `maxStudents` INTEGER NULL,
+  ADD COLUMN IF NOT EXISTS `maxFaculty` INTEGER NULL;
 
 CREATE TABLE IF NOT EXISTS `features` (
   `key` VARCHAR(191) NOT NULL,
@@ -37,29 +39,6 @@ CREATE TABLE IF NOT EXISTS `school_features` (
   `updatedAt` DATETIME(3) NOT NULL,
   UNIQUE INDEX `school_features_schoolId_featureKey_key`(`schoolId`, `featureKey`),
   INDEX `school_features_schoolId_idx`(`schoolId`),
-  PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `school_registration_requests` (
-  `id` VARCHAR(191) NOT NULL,
-  `schoolName` VARCHAR(191) NOT NULL,
-  `email` VARCHAR(191) NOT NULL,
-  `phone` VARCHAR(191) NOT NULL,
-  `address` VARCHAR(191) NOT NULL,
-  `city` VARCHAR(191) NOT NULL,
-  `state` VARCHAR(191) NOT NULL,
-  `country` VARCHAR(191) NOT NULL,
-  `website` VARCHAR(191) NULL,
-  `contactPerson` VARCHAR(191) NOT NULL,
-  `requestedFeatures` JSON NULL,
-  `status` VARCHAR(191) NOT NULL DEFAULT 'PENDING',
-  `reviewedBy` VARCHAR(191) NULL,
-  `reviewedAt` DATETIME(3) NULL,
-  `rejectionReason` VARCHAR(191) NULL,
-  `schoolId` VARCHAR(191) NULL,
-  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  INDEX `school_registration_requests_status_idx`(`status`),
-  INDEX `school_registration_requests_email_idx`(`email`),
   PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

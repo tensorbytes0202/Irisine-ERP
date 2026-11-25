@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Actor, TenantService } from '../platform/tenant.service';
 import { InvitesService } from '../platform/invites.service';
+import { LimitsService } from '../platform/limits.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 
 @Injectable()
@@ -11,9 +12,11 @@ export class StudentsService {
     private prisma: PrismaService,
     private tenant: TenantService,
     private invites: InvitesService,
+    private limits: LimitsService,
   ) {}
 
   async create(dto: CreateStudentDto, actor: Actor) {
+    await this.limits.assertCanAddStudents(actor.schoolId);
     // every id the client sends must belong to the caller's own school
     await this.tenant.classInSchool(dto.classId, actor.schoolId);
     await this.tenant.sectionInSchool(dto.sectionId, actor.schoolId, dto.classId);

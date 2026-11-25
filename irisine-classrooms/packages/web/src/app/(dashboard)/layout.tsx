@@ -85,6 +85,7 @@ import { BrandLogo } from '@/components/brand-logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { brand } from '@/lib/brand';
 import { isPathEnabled } from '@/lib/features';
+import { isFeatureAllowed } from '@/lib/feature-map';
 
 const allNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -238,7 +239,8 @@ const roleNavMap: Record<string, string[]> = {
   STUDENT: ['Dashboard', 'My Fees', 'Timetable', 'Assignments', 'Homework Calendar', 'Notifications', 'Announcements', 'Feedback', 'Certificates', 'Grievances', 'Diary', 'Events', 'Learning Paths', 'Live Classes', 'Course Modules', 'Discussions', 'Gamification'],
 };
 
-const adminRoles = ['SUPER_ADMIN', 'IT_ADMIN'];
+// A school's own administrators see everything their school has been granted (the IT Admin who runs the platform has a separate area).
+const adminRoles = ['SUPER_ADMIN', 'ADMIN', 'IT_ADMIN'];
 
 // Sidebar sections. Har section mein menu items ke naam (allNavigation ke naam se match hone chahiye).
 const navGroups: { name: string; items: string[] }[] = [
@@ -253,9 +255,10 @@ const navGroups: { name: string; items: string[] }[] = [
   { name: 'Settings', items: ['Settings', 'Reports', 'Bulk Operations', 'Compliance', 'Audit Logs'] },
 ];
 
-function getFilteredNav(role: string) {
-  // Feature flag (lib/features.ts) OFF wale items kisi ko bhi nahi dikhte.
-  const enabled = allNavigation.filter((item) => isPathEnabled(item.href));
+function getFilteredNav(role: string, schoolFeatures: string[] | null) {
+  // Feature flag (lib/features.ts) OFF wale items kisi ko bhi nahi dikhte,
+  // aur jo module is school ko IT Admin ne diya hi nahi wo bhi nahi.
+  const enabled = allNavigation.filter((item) => isPathEnabled(item.href) && isFeatureAllowed(item.href, schoolFeatures));
   if (!role || adminRoles.includes(role)) return enabled;
   const allowed = roleNavMap[role];
   if (!allowed) return [allNavigation[0]]; // fallback: Dashboard only
@@ -287,6 +290,7 @@ export default function DashboardLayout({
   const [userRole, setUserRole] = useState('');
   const [userName, setUserName] = useState('');
   const [filteredNav, setFilteredNav] = useState(allNavigation);
+  const [schoolFeatures, setSchoolFeatures] = useState<string[] | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -306,8 +310,8 @@ export default function DashboardLayout({
 
   // Band (OFF) feature ka URL seedha khola to dashboard pe bhej do
   useEffect(() => {
-    if (!isPathEnabled(pathname)) router.replace('/dashboard');
-  }, [pathname, router]);
+    if (!isPathEnabled(pathname) || !isFeatureAllowed(pathname, schoolFeatures)) router.replace('/dashboard');
+  }, [pathname, router, schoolFeatures]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -402,7 +406,14 @@ export default function DashboardLayout({
 
         setUserRole(role);
         setUserName(displayName);
-        setFilteredNav(getFilteredNav(role));
+        // Modules granted to this school (the server enforces this too; this only tidies the menu)
+        let granted: string[] | null = null;
+        try {
+          const fr = await fetch('/api/v1/school/features', { headers: { Authorization: `Bearer ${token}` } });
+          if (fr.ok) granted = (await fr.json()).features ?? null;
+        } catch {}
+        setSchoolFeatures(granted);
+        setFilteredNav(getFilteredNav(role, granted));
         setAuthenticated(true);
       } catch {
         // Network error — force re-login to be safe
@@ -452,7 +463,7 @@ export default function DashboardLayout({
     router.replace('/login');
   }
 
-  if (!isPathEnabled(pathname)) {
+  if (!isPathEnabled(pathname) || !isFeatureAllowed(pathname, schoolFeatures)) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Redirecting...

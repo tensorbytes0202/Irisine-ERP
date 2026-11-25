@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { LimitsService } from './limits.service';
 import { FEATURE_CATALOG, FEATURE_KEYS } from './feature-catalog';
 
 export interface FeatureGrant {
@@ -22,7 +23,10 @@ export class FeaturesService implements OnModuleInit {
   private readonly logger = new Logger(FeaturesService.name);
   private cache = new Map<string, { at: number; keys: Set<string> }>();
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private limits: LimitsService,
+  ) {}
 
   /** Keep the feature master table in sync with the catalogue (never touches school grants). */
   async onModuleInit() {
@@ -123,7 +127,7 @@ export class FeaturesService implements OnModuleInit {
   /** What the school's own users see (for navigation). Core is always on. */
   async myFeatures(schoolId: string) {
     const keys = await this.effectiveKeys(schoolId);
-    return { features: ['CORE', ...keys] };
+    return { features: ['CORE', ...keys], limits: await this.limits.usage(schoolId) };
   }
 
   /**

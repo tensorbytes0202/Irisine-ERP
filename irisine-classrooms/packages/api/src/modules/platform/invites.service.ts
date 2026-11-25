@@ -36,9 +36,13 @@ export class InvitesService {
     return token;
   }
 
-  async send(to: string, orgName: string, token: string, subject = 'Set your password to get started') {
+  link(token: string) {
     const base = (this.config.get<string>('APP_URL') || 'http://localhost:3000').replace(/\/$/, '');
-    const link = `${base}/accept-invite?token=${token}`;
+    return `${base}/accept-invite?token=${token}`;
+  }
+
+  async send(to: string, orgName: string, token: string, subject = 'Set your password to get started') {
+    const link = this.link(token);
     const safeName = orgName.replace(/[<>&"]/g, '');
     const html = `<p>Welcome to Irisine Classrooms.</p>
 <p>An account was created for you at <b>${safeName}</b>. Set your password to get started:</p>

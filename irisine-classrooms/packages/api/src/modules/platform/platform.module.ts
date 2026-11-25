@@ -6,7 +6,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { FeaturesService } from './features.service';
 import { FeatureGuard } from './feature.guard';
 import { PlatformService } from './platform.service';
-import { RegistrationsService } from './registrations.service';
+import { OnboardingService } from './onboarding.service';
+import { LimitsService } from './limits.service';
 import { InvitesService } from './invites.service';
 import { TenantService } from './tenant.service';
 import { PlatformController, PlatformPublicController, SchoolFeaturesController } from './platform.controller';
@@ -25,12 +26,13 @@ import { PlatformController, PlatformPublicController, SchoolFeaturesController 
   providers: [
     FeaturesService,
     PlatformService,
-    RegistrationsService,
+    OnboardingService,
+    LimitsService,
     InvitesService,
     TenantService,
     FeatureGuard,
     { provide: APP_GUARD, useExisting: FeatureGuard },
   ],
-  exports: [FeaturesService, InvitesService, TenantService],
+  exports: [FeaturesService, InvitesService, TenantService, LimitsService],
 })
 export class PlatformModule {}

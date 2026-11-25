@@ -1,21 +1,8 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize, IsArray, IsBoolean, IsEmail, IsIn, IsObject, IsOptional, IsString, IsUrl,
-  Length, MaxLength, MinLength, ValidateNested,
+  ArrayMaxSize, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, Length, Max, MaxLength,
+  Min, MinLength, ValidateIf, ValidateNested,
 } from 'class-validator';
-
-export class SubmitRegistrationDto {
-  @IsString() @Length(2, 150) schoolName: string;
-  @IsEmail() @MaxLength(150) email: string;
-  @IsString() @Length(5, 20) phone: string;
-  @IsString() @Length(3, 300) address: string;
-  @IsString() @Length(2, 80) city: string;
-  @IsString() @Length(2, 80) state: string;
-  @IsString() @Length(2, 80) country: string;
-  @IsOptional() @IsString() @MaxLength(200) website?: string;
-  @IsString() @Length(2, 100) contactPerson: string;
-  @IsOptional() @IsArray() @ArrayMaxSize(50) @IsString({ each: true }) requestedFeatures?: string[];
-}
 
 export class FeatureGrantDto {
   @IsString() key: string;
@@ -24,13 +11,25 @@ export class FeatureGrantDto {
   @IsOptional() @IsObject() config?: Record<string, unknown>;
 }
 
-export class ApproveRegistrationDto {
+export class CreateSchoolDto {
+  @IsString() @Length(2, 150) schoolName: string;
+  @IsString() @Length(2, 100) adminName: string;
+  @IsEmail() @MaxLength(150) adminEmail: string;
+  @IsOptional() @IsString() @MaxLength(20) phone?: string;
+  @IsOptional() @IsString() @MaxLength(300) address?: string;
+  @IsOptional() @IsString() @MaxLength(80) city?: string;
+  @IsOptional() @IsString() @MaxLength(80) state?: string;
+  @IsOptional() @IsString() @MaxLength(80) country?: string;
+  @IsOptional() @IsString() @MaxLength(200) website?: string;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) maxStudents?: number | null;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) maxFaculty?: number | null;
   @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => FeatureGrantDto)
   features: FeatureGrantDto[];
 }
 
-export class RejectRegistrationDto {
-  @IsString() @Length(3, 500) reason: string;
+export class SetLimitsDto {
+  @IsOptional() @ValidateIf((_o, v) => v !== null) @IsInt() @Min(0) @Max(1000000) maxStudents?: number | null;
+  @IsOptional() @ValidateIf((_o, v) => v !== null) @IsInt() @Min(0) @Max(1000000) maxFaculty?: number | null;
 }
 
 export class SetFeaturesDto {

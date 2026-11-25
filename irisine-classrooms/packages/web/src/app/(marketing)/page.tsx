@@ -98,7 +98,7 @@ export default function LandingPage() {
             </p>
             <div className="mt-9 flex flex-col sm:flex-row gap-4">
               <Link
-                href="/register-school"
+                href="/login"
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-3.5 font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 hover:-translate-y-0.5 transition-all"
               >
                 Get Started <ArrowRight className="h-4 w-4" />
@@ -232,7 +232,7 @@ export default function LandingPage() {
                 ))}
               </ul>
               <Link
-                href="/register-school"
+                href="/login"
                 className="mt-8 block rounded-full border border-primary/30 py-3 text-center font-semibold text-primary hover:bg-accent transition-colors"
               >
                 Get Started
@@ -268,19 +268,13 @@ export default function LandingPage() {
             <div className="absolute -bottom-20 -left-10 h-64 w-64 rounded-full bg-white/10" />
             <UserRound className="relative mx-auto h-8 w-8 opacity-80" />
             <h2 className="relative mt-4 text-3xl sm:text-4xl font-bold">Ready to try {brand.name}?</h2>
-            <p className="relative mt-3 text-white/80">Create your school account in a minute.</p>
+            <p className="relative mt-3 text-white/80">Sign in to your portal: Student, Faculty, Super Admin or IT Admin.</p>
             <div className="relative mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href="/register-school"
+                href="/login"
                 className="inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 font-semibold text-primary hover:bg-white/90 hover:-translate-y-0.5 transition-all"
               >
-                Register School <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-2 rounded-full border border-white/40 px-8 py-3.5 font-semibold hover:bg-white/10 transition-colors"
-              >
-                Sign In
+                Sign In <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>

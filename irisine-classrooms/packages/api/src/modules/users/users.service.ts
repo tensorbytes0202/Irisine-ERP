@@ -3,10 +3,14 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { LimitsService, FACULTY_ROLES } from '../platform/limits.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private limits: LimitsService,
+  ) {}
 
   /** Roles an actor may hand out. Admin-level roles can only be created by a school SUPER_ADMIN. */
   private assertCanGrant(actorRole: string, targetRole: string) {
@@ -20,6 +24,7 @@ export class UsersService {
   /** The school always comes from the logged-in user, never from the request body. */
   async create(dto: CreateUserDto, actor: { role: string; schoolId: string }) {
     this.assertCanGrant(actor.role, dto.role);
+    if (FACULTY_ROLES.includes(dto.role)) await this.limits.assertCanAddFaculty(actor.schoolId);
     const email = dto.email.trim().toLowerCase();
     if (await this.prisma.user.findUnique({ where: { email } })) {
       throw new ConflictException('A user with this email already exists');

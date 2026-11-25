@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { InvitesService } from '../platform/invites.service';
+import { LimitsService } from '../platform/limits.service';
 
 export interface StudentImportRow {
   admissionNo: string;
@@ -28,6 +29,7 @@ export class BulkOperationsService {
   constructor(
     private prisma: PrismaService,
     private invites: InvitesService,
+    private limits: LimitsService,
   ) {}
 
   async importStudents(data: StudentImportRow[], schoolId: string): Promise<{ imported: number; errors: string[] }> {
@@ -43,6 +45,7 @@ export class BulkOperationsService {
       const rowLabel = `Row ${i + 1} (${row.admissionNo || 'no admissionNo'})`;
 
       try {
+        await this.limits.assertCanAddStudents(schoolId); // stop the import at the school's limit
         if (!row.admissionNo || !row.firstName || !row.email || !row.classGrade || !row.sectionName) {
           errors.push(`${rowLabel}: Missing required fields (admissionNo, firstName, email, classGrade, sectionName)`);
           continue;

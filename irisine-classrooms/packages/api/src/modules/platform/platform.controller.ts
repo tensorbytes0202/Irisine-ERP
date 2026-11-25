@@ -6,25 +6,17 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PlatformService } from './platform.service';
-import { RegistrationsService } from './registrations.service';
+import { OnboardingService } from './onboarding.service';
+import { LimitsService } from './limits.service';
 import { FeaturesService } from './features.service';
-import {
-  ApproveRegistrationDto, PlatformLoginDto, RejectRegistrationDto, SetFeaturesDto, SetStatusDto,
-  SubmitRegistrationDto, ToggleFeatureDto,
-} from './dto/platform.dto';
+import { CreateSchoolDto, PlatformLoginDto, SetFeaturesDto, SetLimitsDto, SetStatusDto, ToggleFeatureDto } from './dto/platform.dto';
 
-/** Public: school registration request + platform owner login. */
+/** Public: platform owner (IT Admin portal) login. There is no public school registration. */
 @ApiTags('Platform (public)')
 @UseGuards(ThrottlerGuard)
 @Controller('platform-public')
 export class PlatformPublicController {
-  constructor(private platform: PlatformService, private registrations: RegistrationsService) {}
-
-  @Post('school-registrations')
-  @Throttle({ default: { limit: 5, ttl: 3_600_000 } })
-  submit(@Body() dto: SubmitRegistrationDto) {
-    return this.registrations.submit(dto);
-  }
+  constructor(private platform: PlatformService) {}
 
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -42,7 +34,8 @@ export class PlatformPublicController {
 export class PlatformController {
   constructor(
     private platform: PlatformService,
-    private registrations: RegistrationsService,
+    private onboarding: OnboardingService,
+    private limits: LimitsService,
     private features: FeaturesService,
   ) {}
 
@@ -50,25 +43,23 @@ export class PlatformController {
 
   @Get('features') catalog() { return this.features.listCatalog(); }
 
-  @Get('registrations') listRequests(@Query('status') status?: string) { return this.registrations.list(status); }
-  @Get('registrations/:id') getRequest(@Param('id') id: string) { return this.registrations.get(id); }
-
-  @Post('registrations/:id/approve')
-  approve(@Param('id') id: string, @Body() dto: ApproveRegistrationDto, @CurrentUser('sub') by: string) {
-    return this.registrations.approve(id, dto.features, by);
-  }
-
-  @Post('registrations/:id/reject')
-  reject(@Param('id') id: string, @Body() dto: RejectRegistrationDto, @CurrentUser('sub') by: string) {
-    return this.registrations.reject(id, dto.reason, by);
+  @Post('schools')
+  createSchool(@Body() dto: CreateSchoolDto, @CurrentUser('sub') by: string) {
+    return this.onboarding.createSchool(dto, by);
   }
 
   @Get('schools') listSchools(@Query('status') status?: string) { return this.platform.listSchools(status); }
   @Get('schools/:id') getSchool(@Param('id') id: string) { return this.platform.getSchool(id); }
+  @Get('schools/:id/usage') usage(@Param('id') id: string) { return this.limits.usage(id); }
 
   @Patch('schools/:id/status')
   setStatus(@Param('id') id: string, @Body() dto: SetStatusDto) {
     return this.platform.setSchoolStatus(id, dto.status);
+  }
+
+  @Patch('schools/:id/limits')
+  setLimits(@Param('id') id: string, @Body() dto: SetLimitsDto) {
+    return this.limits.setLimits(id, dto);
   }
 
   @Put('schools/:id/features')
@@ -77,7 +68,7 @@ export class PlatformController {
   }
 
   @Post('schools/:id/resend-invite')
-  resend(@Param('id') id: string) { return this.registrations.resendInvite(id); }
+  resend(@Param('id') id: string) { return this.onboarding.resendInvite(id); }
 }
 
 /** A school's own admins: see what is enabled, switch what the platform allowed. */

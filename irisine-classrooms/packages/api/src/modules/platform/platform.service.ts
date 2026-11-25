@@ -23,19 +23,18 @@ export class PlatformService {
       { sub: admin.id, email: admin.email, role: 'PLATFORM_SUPER_ADMIN' },
       { expiresIn: '1h' },
     );
-    return { accessToken, user: { id: admin.id, email: admin.email, name: admin.name, role: 'PLATFORM_SUPER_ADMIN' } };
+    return { accessToken, user: { id: admin.id, email: admin.email, name: admin.name, role: 'PLATFORM_SUPER_ADMIN', portal: 'IT_ADMIN' } };
   }
 
   async stats() {
-    const [schools, active, suspended, pending, users, students] = await Promise.all([
+    const [schools, active, suspended, users, students] = await Promise.all([
       this.prisma.school.count(),
       this.prisma.school.count({ where: { status: 'ACTIVE' } }),
       this.prisma.school.count({ where: { status: 'SUSPENDED' } }),
-      this.prisma.schoolRegistrationRequest.count({ where: { status: 'PENDING' } }),
       this.prisma.user.count(),
       this.prisma.student.count(),
     ]);
-    return { schools, activeSchools: active, suspendedSchools: suspended, pendingRequests: pending, users, students };
+    return { schools, activeSchools: active, suspendedSchools: suspended, users, students };
   }
 
   listSchools(status?: string) {
@@ -44,6 +43,7 @@ export class PlatformService {
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, name: true, code: true, email: true, city: true, state: true, country: true, status: true, createdAt: true,
+        maxStudents: true, maxFaculty: true,
         _count: { select: { users: true, features: true } },
       },
     });

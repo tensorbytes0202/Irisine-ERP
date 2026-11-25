@@ -48,15 +48,9 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <div className="hidden md:flex items-center gap-3">
               <Link
                 href="/login"
-                className="text-sm font-medium px-5 py-2 rounded-full border hover:bg-accent transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/register-school"
                 className="text-sm font-medium px-5 py-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
               >
-                Register School
+                Sign In
               </Link>
             </div>
 
@@ -86,16 +80,9 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               <Link
                 href="/login"
                 onClick={() => setMobileOpen(false)}
-                className="block text-center text-sm font-medium px-4 py-2 rounded-full border"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/register-school"
-                onClick={() => setMobileOpen(false)}
                 className="block text-center text-sm font-medium px-4 py-2 rounded-full bg-primary text-primary-foreground"
               >
-                Register School
+                Sign In
               </Link>
             </div>
           </div>
