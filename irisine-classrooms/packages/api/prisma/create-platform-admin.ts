@@ -15,7 +15,7 @@ async function main() {
   const password = process.env.PLATFORM_ADMIN_PASSWORD;
   const name = process.env.PLATFORM_ADMIN_NAME?.trim() || 'Platform Owner';
   if (!email || !password) throw new Error('Set PLATFORM_ADMIN_EMAIL and PLATFORM_ADMIN_PASSWORD');
-  if (password.length < 12) throw new Error('PLATFORM_ADMIN_PASSWORD must be at least 12 characters');
+  if (password.length < 8) throw new Error('PLATFORM_ADMIN_PASSWORD must be at least 8 characters');
 
   const prisma = new PrismaClient();
   try {

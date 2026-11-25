@@ -111,7 +111,7 @@ npx prisma db push                 # LOCAL database only
 npx nest build
 
 # create the platform owner once (never via API)
-PLATFORM_ADMIN_EMAIL=owner@yourcompany.com PLATFORM_ADMIN_PASSWORD='at-least-12-chars' npx ts-node prisma/create-platform-admin.ts
+PLATFORM_ADMIN_EMAIL=owner@yourcompany.com PLATFORM_ADMIN_PASSWORD='a-strong-password' npx ts-node prisma/create-platform-admin.ts
 
 node dist/main.js                  # http://localhost:4000, docs at /api/docs
 ```
