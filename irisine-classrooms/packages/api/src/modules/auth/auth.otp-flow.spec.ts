@@ -3,12 +3,13 @@ import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
 
-function build(user: any | null) {
+function build(user: any | null, schoolStatus: string | null = 'ACTIVE') {
   const prisma: any = {
     user: {
       findUnique: jest.fn(async () => user),
       update: jest.fn(async ({ data }: any) => ({ ...user, ...data })),
     },
+    school: { findUnique: jest.fn(async () => (schoolStatus ? { status: schoolStatus } : null)) },
     refreshToken: { deleteMany: jest.fn(async () => ({ count: 2 })), create: jest.fn(async () => ({})) },
     $transaction: jest.fn(async (ops: any[]) => Promise.all(ops)),
   };
@@ -60,8 +61,8 @@ describe('forgot password flow', () => {
 describe('login: portal and school status are checked on the server', () => {
   async function loginWith(role: string, schoolStatus = 'ACTIVE') {
     const passwordHash = await bcrypt.hash('Passw0rd!', 4);
-    const user = { id: 'u', email: 'x@test.com', passwordHash, isActive: true, role, schoolId: 's', school: { status: schoolStatus } };
-    return build(user as any);
+    const user = { id: 'u', email: 'x@test.com', passwordHash, isActive: true, role, schoolId: 's' };
+    return build(user as any, schoolStatus);
   }
 
   it('lets a teacher into the FACULTY portal and reports the portal', async () => {
@@ -78,6 +79,18 @@ describe('login: portal and school status are checked on the server', () => {
   it('refuses a faculty member who asks for the SUPER_ADMIN portal', async () => {
     const { svc } = await loginWith('SUBJECT_TEACHER');
     await expect(svc.login({ email: 'x@test.com', password: 'Passw0rd!', portal: 'SUPER_ADMIN' })).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('lets a school IT Admin into the IT_ADMIN portal', async () => {
+    const { svc } = await loginWith('IT_ADMIN');
+    const res: any = await svc.login({ email: 'x@test.com', password: 'Passw0rd!', portal: 'IT_ADMIN' });
+    expect(res.user).toMatchObject({ role: 'IT_ADMIN', portal: 'IT_ADMIN', schoolId: 's' });
+  });
+
+  it('refuses an account whose school does not exist', async () => {
+    const passwordHash = await bcrypt.hash('Passw0rd!', 4);
+    const { svc } = build({ id: 'u', email: 'x@test.com', passwordHash, isActive: true, role: 'IT_ADMIN', schoolId: 'gone' }, null);
+    await expect(svc.login({ email: 'x@test.com', password: 'Passw0rd!' })).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('blocks everyone in a suspended school (after the password is checked)', async () => {

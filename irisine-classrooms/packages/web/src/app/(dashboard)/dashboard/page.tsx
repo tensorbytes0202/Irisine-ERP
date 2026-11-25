@@ -1292,7 +1292,7 @@ function AdminDashboard() {
 
 // ─── Root page ────────────────────────────────────────────────────
 
-const TEACHER_ROLES = ['CLASS_TEACHER', 'SUBJECT_TEACHER', 'ACADEMIC_COORDINATOR'];
+const TEACHER_ROLES = ['FACULTY', 'CLASS_TEACHER', 'SUBJECT_TEACHER', 'ACADEMIC_COORDINATOR'];
 const ADMIN_ROLES = ['SUPER_ADMIN', 'IT_ADMIN', 'DIRECTOR'];
 
 export default function DashboardPage() {

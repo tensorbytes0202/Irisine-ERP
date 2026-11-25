@@ -11,12 +11,17 @@ vi.mock('@/components/auth-shell', () => ({ AuthShell: ({ children }: any) => <d
 import LoginPage from './page';
 
 const calls: { url: string; body: any }[] = [];
+const session = (portal: string) => ({
+  ok: true,
+  status: 201,
+  json: async () => ({ accessToken: 't', refreshToken: 'r', user: { portal } }),
+});
 let respond: (url: string) => any;
 
 beforeEach(() => {
   calls.length = 0;
   push.mockClear();
-  respond = () => ({ ok: true, status: 201, json: async () => ({ accessToken: 't', refreshToken: 'r', user: { portal: 'X' } }) });
+  respond = () => session('FACULTY');
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: any) => {
     calls.push({ url, body: JSON.parse(init.body) });
     return respond(url);
@@ -54,12 +59,27 @@ describe('login page with four portals', () => {
     expect(calls[0].body).toEqual({ email: 'a@b.test', password: 'Password-123', portal: 'FACULTY' });
   });
 
-  it('the IT Admin portal uses the platform login and opens /platform', async () => {
+  it('the IT Admin portal uses the school login and opens the IT Admin dashboard', async () => {
+    respond = () => session('IT_ADMIN');
     render(<LoginPage />);
     signIn('IT Admin');
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/platform'));
-    expect(calls[0].url).toMatch(/\/platform-public\/login$/);
-    expect(calls[0].body).toEqual({ email: 'a@b.test', password: 'Password-123' });
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/it-admin'));
+    expect(calls[0].url).toMatch(/\/auth\/login$/);
+    expect(calls[0].body).toEqual({ email: 'a@b.test', password: 'Password-123', portal: 'IT_ADMIN' });
+  });
+
+  it('redirects by the portal in the server response, not by the selected card', async () => {
+    respond = () => session('STUDENT');
+    render(<LoginPage />);
+    signIn('IT Admin');
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/dashboard'));
+  });
+
+  it('does not blame the password when the server fails', async () => {
+    respond = () => ({ ok: false, status: 500, json: async () => ({}) });
+    render(<LoginPage />);
+    signIn('IT Admin');
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Server error. Please try again later.');
   });
 
   it('shows the server message when the account belongs to a different portal', async () => {

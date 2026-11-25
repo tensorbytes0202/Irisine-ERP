@@ -5,7 +5,6 @@ import {
   Patch,
   Param,
   Body,
-  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -19,21 +18,21 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @ApiTags('Settings')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'IT_ADMIN')
+@Roles('SUPER_ADMIN', 'ADMIN', 'IT_ADMIN')
 @Controller('settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all settings grouped by category' })
-  findAll(@Query('schoolId') schoolId: string) {
-    return this.settingsService.findAll(schoolId || '');
+  findAll(@CurrentUser('schoolId') schoolId: string) {
+    return this.settingsService.findAll(schoolId);
   }
 
   @Get(':key')
   @ApiOperation({ summary: 'Get a single setting by key' })
-  findOne(@Param('key') key: string) {
-    return this.settingsService.findOne(key);
+  findOne(@Param('key') key: string, @CurrentUser('schoolId') schoolId: string) {
+    return this.settingsService.findOne(key, schoolId);
   }
 
   @Patch(':key')
@@ -42,16 +41,17 @@ export class SettingsController {
     @Param('key') key: string,
     @Body() dto: UpdateSettingDto,
     @CurrentUser('sub') userId: string,
+    @CurrentUser('schoolId') schoolId: string,
   ) {
-    return this.settingsService.update(key, dto, userId);
+    return this.settingsService.update(key, dto, userId, schoolId);
   }
 
   @Post('seed-defaults')
   @ApiOperation({ summary: 'Seed default settings (skips existing keys)' })
   seedDefaults(
-    @Query('schoolId') schoolId: string,
+    @CurrentUser('schoolId') schoolId: string,
     @CurrentUser('sub') userId: string,
   ) {
-    return this.settingsService.seedDefaults(schoolId || '', userId);
+    return this.settingsService.seedDefaults(schoolId, userId);
   }
 }

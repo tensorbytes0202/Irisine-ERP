@@ -130,6 +130,20 @@ export class FeaturesService implements OnModuleInit {
     return { features: ['CORE', ...keys], limits: await this.limits.usage(schoolId) };
   }
 
+  /** Every module the platform granted to this school, including ones its admin switched off. */
+  async grantedModules(schoolId: string) {
+    const rows = await this.listForSchool(schoolId);
+    return rows
+      .filter((r) => r.enabled && r.feature.isActive)
+      .map((r) => ({
+        key: r.featureKey,
+        name: r.feature.name,
+        category: r.feature.category,
+        adminManageable: r.adminManageable,
+        adminEnabled: !r.adminManageable || r.adminEnabled,
+      }));
+  }
+
   /**
    * A school admin switches a feature on/off. Allowed only for features the platform granted
    * AND marked as admin-manageable. Admins can never grant anything new.

@@ -23,7 +23,7 @@ export class PlatformService {
       { sub: admin.id, email: admin.email, role: 'PLATFORM_SUPER_ADMIN' },
       { expiresIn: '1h' },
     );
-    return { accessToken, user: { id: admin.id, email: admin.email, name: admin.name, role: 'PLATFORM_SUPER_ADMIN', portal: 'IT_ADMIN' } };
+    return { accessToken, user: { id: admin.id, email: admin.email, name: admin.name, role: 'PLATFORM_SUPER_ADMIN', portal: 'PLATFORM' } };
   }
 
   async stats() {

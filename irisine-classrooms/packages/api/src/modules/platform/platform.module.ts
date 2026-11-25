@@ -10,6 +10,7 @@ import { OnboardingService } from './onboarding.service';
 import { LimitsService } from './limits.service';
 import { InvitesService } from './invites.service';
 import { TenantService } from './tenant.service';
+import { SchoolProfileService } from './school-profile.service';
 import { PlatformController, PlatformPublicController, SchoolFeaturesController } from './platform.controller';
 
 @Global()
@@ -30,6 +31,7 @@ import { PlatformController, PlatformPublicController, SchoolFeaturesController 
     LimitsService,
     InvitesService,
     TenantService,
+    SchoolProfileService,
     FeatureGuard,
     { provide: APP_GUARD, useExisting: FeatureGuard },
   ],

@@ -8,6 +8,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PlatformService } from './platform.service';
 import { OnboardingService } from './onboarding.service';
 import { LimitsService } from './limits.service';
+import { SchoolProfileService } from './school-profile.service';
+import { UpdateSchoolProfileDto } from './dto/school-profile.dto';
 import { FeaturesService } from './features.service';
 import { CreateSchoolDto, PlatformLoginDto, SetFeaturesDto, SetLimitsDto, SetStatusDto, ToggleFeatureDto } from './dto/platform.dto';
 
@@ -77,7 +79,28 @@ export class PlatformController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('school')
 export class SchoolFeaturesController {
-  constructor(private features: FeaturesService) {}
+  constructor(
+    private features: FeaturesService,
+    private profile: SchoolProfileService,
+  ) {}
+
+  @Get('profile')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'IT_ADMIN')
+  getProfile(@CurrentUser('schoolId') schoolId: string) {
+    return this.profile.get(schoolId);
+  }
+
+  @Patch('profile')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'IT_ADMIN')
+  updateProfile(@Body() dto: UpdateSchoolProfileDto, @CurrentUser('schoolId') schoolId: string) {
+    return this.profile.update(schoolId, dto);
+  }
+
+  @Get('modules')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'IT_ADMIN')
+  modules(@CurrentUser('schoolId') schoolId: string) {
+    return this.features.grantedModules(schoolId);
+  }
 
   @Get('features')
   mine(@CurrentUser('schoolId') schoolId: string) {
@@ -85,7 +108,7 @@ export class SchoolFeaturesController {
   }
 
   @Patch('features/:key')
-  @Roles('SUPER_ADMIN', 'IT_ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'IT_ADMIN')
   toggle(@Param('key') key: string, @Body() dto: ToggleFeatureDto, @CurrentUser('schoolId') schoolId: string) {
     return this.features.adminToggle(schoolId, key, dto.enabled);
   }

@@ -5,6 +5,7 @@ import { LoginDto } from './dto/login.dto';
 import { SendOtpDto, VerifyOtpDto, ResetPasswordDto, AcceptInviteDto } from './dto/otp.dto';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @ApiTags('Auth')
@@ -70,10 +71,7 @@ export class AuthController {
   @Post('change-password')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  changePassword(
-    @Req() req: any,
-    @Body() body: { currentPassword: string; newPassword: string },
-  ) {
+  changePassword(@Req() req: any, @Body() body: ChangePasswordDto) {
     return this.authService.changePassword(
       req.user.sub,
       body.currentPassword,

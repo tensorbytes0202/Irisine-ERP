@@ -77,71 +77,84 @@ const DEFAULT_SETTINGS: DefaultSetting[] = [
   },
 ];
 
+/**
+ * The `key` column is unique across the whole table, so a school's own row is stored as
+ * "<schoolId>:<key>" (older rows keep the plain key). Callers only ever see the plain key,
+ * and every query is limited to the caller's school.
+ */
 @Injectable()
 export class SettingsService {
   constructor(private prisma: PrismaService) {}
 
+  private publicRow<T extends { key: string; schoolId: string }>(row: T): T {
+    return { ...row, key: row.key.replace(`${row.schoolId}:`, '') };
+  }
+
+  private findRow(key: string, schoolId: string) {
+    return this.prisma.systemSetting.findFirst({
+      where: { schoolId, key: { in: [key, `${schoolId}:${key}`] } },
+    });
+  }
+
   async findAll(schoolId: string) {
     const settings = await this.prisma.systemSetting.findMany({
       where: { schoolId },
-      orderBy: [{ category: 'asc' }, { key: 'asc' }],
+      orderBy: [{ category: 'asc' }, { label: 'asc' }],
     });
 
     // Group by category
     const grouped: Record<string, typeof settings> = {};
     for (const setting of settings) {
-      if (!grouped[setting.category]) {
-        grouped[setting.category] = [];
-      }
-      grouped[setting.category].push(setting);
+      (grouped[setting.category] ??= []).push(this.publicRow(setting));
     }
 
     return grouped;
   }
 
-  async findOne(key: string) {
-    const setting = await this.prisma.systemSetting.findUnique({ where: { key } });
+  async findOne(key: string, schoolId: string) {
+    const setting = await this.findRow(key, schoolId);
     if (!setting) {
       throw new NotFoundException(`Setting "${key}" not found`);
     }
-    return setting;
+    return this.publicRow(setting);
   }
 
-  async update(key: string, dto: UpdateSettingDto, updatedBy: string) {
-    const setting = await this.prisma.systemSetting.findUnique({ where: { key } });
+  async update(key: string, dto: UpdateSettingDto, updatedBy: string, schoolId: string) {
+    const setting = await this.findRow(key, schoolId);
     if (!setting) {
       throw new NotFoundException(`Setting "${key}" not found`);
     }
-    return this.prisma.systemSetting.update({
-      where: { key },
+    const updated = await this.prisma.systemSetting.update({
+      where: { id: setting.id },
       data: {
         value: dto.value,
         updatedBy,
       },
     });
+    return this.publicRow(updated);
   }
 
   async seedDefaults(schoolId: string, seededBy: string) {
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { name: true } });
     const results: { key: string; action: string }[] = [];
 
     for (const def of DEFAULT_SETTINGS) {
-      const existing = await this.prisma.systemSetting.findUnique({ where: { key: def.key } });
-      if (!existing) {
-        await this.prisma.systemSetting.create({
-          data: {
-            key: def.key,
-            value: def.value,
-            category: def.category,
-            label: def.label,
-            type: def.type,
-            schoolId,
-            updatedBy: seededBy,
-          },
-        });
-        results.push({ key: def.key, action: 'CREATED' });
-      } else {
+      if (await this.findRow(def.key, schoolId)) {
         results.push({ key: def.key, action: 'SKIPPED' });
+        continue;
       }
+      await this.prisma.systemSetting.create({
+        data: {
+          key: `${schoolId}:${def.key}`,
+          value: def.key === 'school_name' && school ? school.name : def.value,
+          category: def.category,
+          label: def.label,
+          type: def.type,
+          schoolId,
+          updatedBy: seededBy,
+        },
+      });
+      results.push({ key: def.key, action: 'CREATED' });
     }
 
     return { seeded: results };

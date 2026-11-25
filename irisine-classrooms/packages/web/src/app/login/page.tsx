@@ -5,14 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GraduationCap, Presentation, School, ServerCog } from 'lucide-react';
 import { brand } from '@/lib/brand';
-import { API, PortalKey, saveSession } from '@/lib/api';
+import { API, PortalKey, homeForPortal, saveSession } from '@/lib/api';
 import { AuthShell } from '@/components/auth-shell';
 
 const PORTALS: { key: PortalKey; title: string; hint: string; icon: any }[] = [
   { key: 'STUDENT', title: 'Student', hint: 'Timetable, homework, fees, live classes', icon: GraduationCap },
   { key: 'FACULTY', title: 'Faculty', hint: 'Attendance, grading, assignments, classes', icon: Presentation },
   { key: 'SUPER_ADMIN', title: 'Super Admin', hint: 'Run your school: students, staff, fees', icon: School },
-  { key: 'IT_ADMIN', title: 'IT Admin', hint: 'Platform: schools, limits and features', icon: ServerCog },
+  { key: 'IT_ADMIN', title: 'IT Admin', hint: 'Users, school setup and settings', icon: ServerCog },
 ];
 
 export default function LoginPage() {
@@ -30,24 +30,25 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // The IT Admin portal is the platform owner's own login. Every other portal uses the school login,
-      // and the server checks that the account really belongs to the portal that was picked.
-      const isPlatform = portal === 'IT_ADMIN';
-      const res = await fetch(`${API}${isPlatform ? '/platform-public/login' : '/auth/login'}`, {
+      // The server checks that the account really belongs to the portal that was picked.
+      const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(isPlatform ? { email, password } : { email, password, portal }),
+        body: JSON.stringify({ email, password, portal }),
       });
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         const msg = typeof data.message === 'string' ? data.message : data.message?.message;
         if (res.status === 403 && msg) throw new Error(msg);
+        if (res.status === 429) throw new Error('Too many attempts. Please wait a minute and try again.');
+        if (res.status >= 500) throw new Error('Server error. Please try again later.');
         throw new Error('Invalid email or password');
       }
 
       saveSession(data);
-      router.push(isPlatform ? '/platform' : '/dashboard');
+      // Where to go comes from the verified response, not from the card that was selected
+      router.push(homeForPortal(data.user?.portal));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid email or password');
     } finally {
@@ -127,13 +128,11 @@ export default function LoginPage() {
             {loading ? 'Signing in...' : `Sign in as ${PORTALS.find((p) => p.key === portal)!.title}`}
           </button>
 
-          {portal !== 'IT_ADMIN' && (
-            <div className="text-center pt-1">
-              <Link href="/forgot-password" className="text-sm text-primary hover:underline">
-                Forgot Password?
-              </Link>
-            </div>
-          )}
+          <div className="text-center pt-1">
+            <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+              Forgot Password?
+            </Link>
+          </div>
         </form>
       </div>
     </AuthShell>

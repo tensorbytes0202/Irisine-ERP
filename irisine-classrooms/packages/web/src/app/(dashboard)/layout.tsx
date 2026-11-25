@@ -80,12 +80,14 @@ import {
   ChevronRight,
   Menu,
   X,
+  Blocks,
 } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { brand } from '@/lib/brand';
 import { isPathEnabled } from '@/lib/features';
 import { isFeatureAllowed } from '@/lib/feature-map';
+import { IT_ADMIN_HOME, canItAdminOpen, itAdminItems } from '@/lib/it-admin';
 
 const allNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -191,7 +193,7 @@ const allNavigation = [
 ];
 
 // Map each role to the nav item names it may access.
-// SUPER_ADMIN and IT_ADMIN see everything (handled below).
+// A school's SUPER_ADMIN sees everything (handled below); IT_ADMIN has its own menu (lib/it-admin.ts).
 const roleNavMap: Record<string, string[]> = {
   DIRECTOR: [
     'Dashboard', 'Analytics', 'Report Cards', 'Compliance', 'Fee Management', 'Online Payments',
@@ -239,8 +241,24 @@ const roleNavMap: Record<string, string[]> = {
   STUDENT: ['Dashboard', 'My Fees', 'Timetable', 'Assignments', 'Homework Calendar', 'Notifications', 'Announcements', 'Feedback', 'Certificates', 'Grievances', 'Diary', 'Events', 'Learning Paths', 'Live Classes', 'Course Modules', 'Discussions', 'Gamification'],
 };
 
-// A school's own administrators see everything their school has been granted (the IT Admin who runs the platform has a separate area).
-const adminRoles = ['SUPER_ADMIN', 'ADMIN', 'IT_ADMIN'];
+// A school's own administrators see everything their school has been granted.
+const adminRoles = ['SUPER_ADMIN', 'ADMIN'];
+
+// Same menus for roles that are variants of another one
+roleNavMap.PRINCIPAL = roleNavMap.DIRECTOR;
+roleNavMap.FACULTY = roleNavMap.CLASS_TEACHER;
+
+const itAdminIcons: Record<string, typeof LayoutDashboard> = {
+  '/it-admin': LayoutDashboard,
+  '/users': Users,
+  '/it-admin/faculty': Contact,
+  '/students': GraduationCap,
+  '/it-admin/school': Building,
+  '/classes': LayoutGrid,
+  '/it-admin/modules': Blocks,
+  '/settings': Settings2,
+  '/account': UserCog,
+};
 
 // Sidebar sections. Har section mein menu items ke naam (allNavigation ke naam se match hone chahiye).
 const navGroups: { name: string; items: string[] }[] = [
@@ -256,6 +274,9 @@ const navGroups: { name: string; items: string[] }[] = [
 ];
 
 function getFilteredNav(role: string, schoolFeatures: string[] | null) {
+  if (role === 'IT_ADMIN') {
+    return itAdminItems(schoolFeatures).map((i) => ({ name: i.name, href: i.href, icon: itAdminIcons[i.href] }));
+  }
   // Feature flag (lib/features.ts) OFF wale items kisi ko bhi nahi dikhte,
   // aur jo module is school ko IT Admin ne diya hi nahi wo bhi nahi.
   const enabled = allNavigation.filter((item) => isPathEnabled(item.href) && isFeatureAllowed(item.href, schoolFeatures));
@@ -308,10 +329,37 @@ export default function DashboardLayout({
     });
   }
 
-  // Band (OFF) feature ka URL seedha khola to dashboard pe bhej do
+  // Jo page is role/school ke liye nahi hai uska URL seedha khola to apne home pe bhej do.
+  // Role server (/users/me) se aata hai; API har request par khud bhi check karti hai.
+  const isItAdmin = userRole === 'IT_ADMIN';
+  const blocked =
+    authenticated &&
+    (!isPathEnabled(pathname) ||
+      (isItAdmin
+        ? !canItAdminOpen(pathname, schoolFeatures)
+        : pathname.startsWith(IT_ADMIN_HOME) || !isFeatureAllowed(pathname, schoolFeatures)));
+  const home = isItAdmin ? IT_ADMIN_HOME : '/dashboard';
+
   useEffect(() => {
-    if (!isPathEnabled(pathname) || !isFeatureAllowed(pathname, schoolFeatures)) router.replace('/dashboard');
-  }, [pathname, router, schoolFeatures]);
+    if (blocked) router.replace(home);
+  }, [blocked, home, router]);
+
+  // Modules page ne koi switch badla to menu dobara banao
+  useEffect(() => {
+    async function refresh() {
+      try {
+        const res = await fetch('/api/v1/school/features', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` },
+        });
+        if (!res.ok) return;
+        const granted: string[] = (await res.json()).features;
+        setSchoolFeatures(granted);
+        setFilteredNav(getFilteredNav(userRole, granted));
+      } catch {}
+    }
+    window.addEventListener('school-features-changed', refresh);
+    return () => window.removeEventListener('school-features-changed', refresh);
+  }, [userRole]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -441,7 +489,7 @@ export default function DashboardLayout({
 
   // Menu items ko sections mein baantna (sirf wahi jo is user ko allowed hain)
   const placed = new Set<string>();
-  const visibleGroups = navGroups
+  const visibleGroups = (isItAdmin ? [{ name: 'IT Admin', items: filteredNav.map((i) => i.name) }] : navGroups)
     .map((g) => ({
       name: g.name,
       items: g.items
@@ -453,8 +501,8 @@ export default function DashboardLayout({
   const leftovers = filteredNav.filter((i) => !placed.has(i.name));
   if (leftovers.length) visibleGroups.push({ name: 'More', items: leftovers });
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
-  const activeGroup = visibleGroups.find((g) => g.items.some((i) => isActive(i.href)))?.name;
+  const isActive = (href: string) => pathname === href || (href !== IT_ADMIN_HOME && pathname.startsWith(href + '/'));
+  const activeGroup = isItAdmin ? 'IT Admin' : visibleGroups.find((g) => g.items.some((i) => isActive(i.href)))?.name;
 
   function signOut() {
     localStorage.removeItem('accessToken');
@@ -463,7 +511,7 @@ export default function DashboardLayout({
     router.replace('/login');
   }
 
-  if (!isPathEnabled(pathname) || !isFeatureAllowed(pathname, schoolFeatures)) {
+  if (blocked) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Redirecting...
@@ -474,7 +522,7 @@ export default function DashboardLayout({
   const sidebarInner = (
     <>
       <div className={`flex items-center border-b h-16 ${collapsed ? 'justify-center px-2' : 'px-5'}`}>
-        <Link href="/dashboard" aria-label={brand.name}>
+        <Link href={home} aria-label={brand.name}>
           <BrandLogo showText={!collapsed} />
         </Link>
       </div>
@@ -585,8 +633,8 @@ export default function DashboardLayout({
             <Menu className="h-5 w-5" />
           </button>
 
-        {/* Global Search */}
-        <div className="relative w-full max-w-md" ref={searchRef}>
+        {/* Global Search (not part of the IT Admin's area) */}
+        <div className={`relative w-full max-w-md ${isItAdmin ? 'hidden' : ''}`} ref={searchRef}>
           <div className="relative">
             <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
             <input

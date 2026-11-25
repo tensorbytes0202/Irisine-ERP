@@ -2,6 +2,11 @@ export const API = process.env.NEXT_PUBLIC_API_URL;
 
 export type PortalKey = 'STUDENT' | 'FACULTY' | 'SUPER_ADMIN' | 'IT_ADMIN';
 
+/** Landing page for the portal the server reported at login. */
+export function homeForPortal(portal?: string): string {
+  return portal === 'IT_ADMIN' ? '/it-admin' : '/dashboard';
+}
+
 /** Tokens live in localStorage (set at login). The server re-checks every request, so this is only convenience. */
 export function getToken(): string {
   try {
@@ -38,7 +43,9 @@ export async function apiFetch<T = any>(path: string, init: RequestInit = {}): P
   const data = await res.json().catch(() => ({}));
   if (res.status === 401) {
     clearSession();
-    if (typeof window !== 'undefined') window.location.href = '/login';
+    if (typeof window !== 'undefined') {
+      window.location.href = window.location.pathname.startsWith('/platform') ? '/platform-login' : '/login';
+    }
   }
   if (!res.ok) {
     const msg = Array.isArray(data.message) ? data.message[0] : data.message;

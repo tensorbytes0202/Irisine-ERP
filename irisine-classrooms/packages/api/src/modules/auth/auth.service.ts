@@ -28,7 +28,6 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.trim().toLowerCase() },
-      include: { school: { select: { status: true } } },
     });
 
     if (!user || !user.isActive) {
@@ -40,9 +39,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (user.school.status !== 'ACTIVE') {
-      throw new ForbiddenException({ code: 'SCHOOL_NOT_ACTIVE', message: 'Your school account is not active' });
-    }
+    await this.assertSchoolActive(user.schoolId);
 
     // The portal the user picked is only a request. The real role comes from the database.
     const portal = portalForRole(user.role);
@@ -117,8 +114,21 @@ export class AuthService {
     }
 
     await this.prisma.refreshToken.delete({ where: { id: stored.id } });
+    if (!stored.user.isActive) throw new UnauthorizedException('Invalid refresh token');
+    await this.assertSchoolActive(stored.user.schoolId);
 
     return this.generateTokens(stored.user);
+  }
+
+  /** Every school account must belong to an existing, active school. */
+  private async assertSchoolActive(schoolId: string) {
+    const school = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { status: true } });
+    if (!school) {
+      throw new ForbiddenException({ code: 'SCHOOL_NOT_LINKED', message: 'This account is not linked to a school' });
+    }
+    if (school.status !== 'ACTIVE') {
+      throw new ForbiddenException({ code: 'SCHOOL_NOT_ACTIVE', message: 'Your school account is not active' });
+    }
   }
 
   async logout(userId: string) {
@@ -166,15 +176,22 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash },
-    });
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+      this.prisma.refreshToken.deleteMany({ where: { userId } }),
+    ]);
 
     return { message: 'Password changed successfully' };
   }
 
-  private async generateTokens(user: { id: string; email: string; role: string; schoolId: string }) {
+  private async generateTokens(user: {
+    id: string;
+    email: string;
+    role: string;
+    schoolId: string;
+    firstName: string;
+    lastName: string;
+  }) {
     const payload = {
       sub: user.id,
       email: user.email,
@@ -206,6 +223,9 @@ export class AuthService {
         email: user.email,
         role: user.role,
         portal: portalForRole(user.role) as Portal | null,
+        schoolId: user.schoolId,
+        firstName: user.firstName,
+        lastName: user.lastName,
       },
     };
   }

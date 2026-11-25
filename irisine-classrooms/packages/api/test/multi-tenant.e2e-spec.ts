@@ -118,9 +118,9 @@ describe('Multi-tenant platform (e2e)', () => {
       expect((await request(http()).get(`${api}/platform/schools`)).status).toBe(401);
     });
 
-    it('the platform owner signs in through the IT Admin portal', async () => {
+    it('the platform owner login is marked as the platform, not a school portal', async () => {
       const ok = await request(http()).post(`${api}/platform-public/login`).send({ email: PLATFORM_EMAIL, password: PLATFORM_PASSWORD });
-      expect(ok.body.user.portal).toBe('IT_ADMIN');
+      expect(ok.body.user.portal).toBe('PLATFORM');
     });
 
     it('there is no public school registration any more', async () => {
@@ -275,7 +275,7 @@ describe('Multi-tenant platform (e2e)', () => {
       const row = await prisma.user.findUnique({ where: { email: itEmail } });
       expect(row!.schoolId).toBe(schools.A.id); // not school B
       adminUserId = (await prisma.user.findFirst({ where: { schoolId: schools.A.id, role: 'SUPER_ADMIN' } }))!.id;
-      const l = await login(itEmail, 'It-Admin-Pass-1', 'SUPER_ADMIN'); // a school-level IT account lives in the school admin portal
+      const l = await login(itEmail, 'It-Admin-Pass-1', 'IT_ADMIN'); // the school's own IT account
       expect(l.status).toBe(201);
       itToken = l.body.accessToken;
     });

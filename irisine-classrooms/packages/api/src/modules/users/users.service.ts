@@ -3,7 +3,10 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { LimitsService, FACULTY_ROLES } from '../platform/limits.service';
+
+const PROTECTED_ROLES = ['SUPER_ADMIN', 'ADMIN', 'IT_ADMIN', 'DIRECTOR', 'PRINCIPAL'];
 
 @Injectable()
 export class UsersService {
@@ -12,12 +15,18 @@ export class UsersService {
     private limits: LimitsService,
   ) {}
 
-  /** Roles an actor may hand out. Admin-level roles can only be created by a school SUPER_ADMIN. */
+  /**
+   * Admin and leadership accounts belong to the school Super Admin alone. Without this an IT Admin
+   * could create a Director with a password of its choice and sign in with far more access.
+   */
+  private isProtected(actorRole: string, targetRole: string) {
+    return actorRole !== 'SUPER_ADMIN' && PROTECTED_ROLES.includes(targetRole);
+  }
+
   private assertCanGrant(actorRole: string, targetRole: string) {
-    const ADMIN_ROLES = ['SUPER_ADMIN', 'IT_ADMIN', 'ADMIN', 'PLATFORM_SUPER_ADMIN'];
     if (targetRole === 'PLATFORM_SUPER_ADMIN') throw new ForbiddenException('This role cannot be granted here');
-    if (ADMIN_ROLES.includes(targetRole) && actorRole !== 'SUPER_ADMIN') {
-      throw new ForbiddenException('Only the school Super Admin can create admin accounts');
+    if (this.isProtected(actorRole, targetRole)) {
+      throw new ForbiddenException('Only the school Super Admin can create admin and leadership accounts');
     }
   }
 
@@ -89,6 +98,19 @@ export class UsersService {
     return user;
   }
 
+  async updateProfile(id: string, dto: UpdateProfileDto) {
+    const { firstName, lastName, phone } = dto;
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        ...(firstName !== undefined && { firstName }),
+        ...(lastName !== undefined && { lastName }),
+        ...(phone !== undefined && { phone }),
+      },
+    });
+    return this.findById(id);
+  }
+
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({ where: { email } });
   }
@@ -108,8 +130,8 @@ export class UsersService {
 
   async update(id: string, dto: UpdateUserDto, actor: { sub: string; role: string; schoolId: string }) {
     const target = await this.findInSchool(id, actor.schoolId);
-    if (actor.role !== 'SUPER_ADMIN' && ['SUPER_ADMIN', 'IT_ADMIN', 'ADMIN'].includes(target.role)) {
-      throw new ForbiddenException('Only the school Super Admin can change admin accounts');
+    if (this.isProtected(actor.role, target.role)) {
+      throw new ForbiddenException('Only the school Super Admin can change admin and leadership accounts');
     }
     if (id === actor.sub && dto.isActive === false) {
       throw new ForbiddenException('You cannot deactivate your own account');
@@ -117,6 +139,9 @@ export class UsersService {
     // Only these profile fields can change here. Role, school and password are never taken from the
     // request, so an update can neither escalate a role nor move a user to another school.
     const { firstName, lastName, phone, avatarUrl, isActive } = dto;
+    if (isActive === true && !target.isActive && FACULTY_ROLES.includes(target.role)) {
+      await this.limits.assertCanAddFaculty(actor.schoolId);
+    }
     return this.prisma.user.update({
       where: { id },
       data: {

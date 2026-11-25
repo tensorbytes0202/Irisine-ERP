@@ -12,6 +12,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -39,6 +40,12 @@ export class UsersController {
   @Get('me')
   getProfile(@CurrentUser('sub') userId: string) {
     return this.usersService.findById(userId);
+  }
+
+  /** Anyone may edit their own name and phone. Declared before ':id'. */
+  @Patch('me')
+  updateProfile(@Body() dto: UpdateProfileDto, @CurrentUser('sub') userId: string) {
+    return this.usersService.updateProfile(userId, dto);
   }
 
   @Get(':id')
