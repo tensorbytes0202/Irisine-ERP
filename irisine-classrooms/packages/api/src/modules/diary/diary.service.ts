@@ -48,6 +48,26 @@ export class DiaryService {
     });
   }
 
+  /** What a student or parent may read: published notes for their class, and those about their child. */
+  async getForFamily(user: { sub: string; role: string }, date?: string) {
+    const students = await this.prisma.student.findMany({
+      where: user.role === 'STUDENT' ? { userId: user.sub } : { guardians: { some: { userId: user.sub } } },
+      select: { id: true, classId: true, sectionId: true },
+    });
+    if (!students.length) return [];
+    return this.prisma.diaryEntry.findMany({
+      where: {
+        isPublished: true,
+        ...(date && { date: new Date(date) }),
+        OR: students.flatMap((s) => [
+          { studentId: s.id },
+          { studentId: null, classId: s.classId, OR: [{ sectionId: null }, { sectionId: '' }, { sectionId: s.sectionId }] },
+        ]),
+      },
+      orderBy: [{ date: 'desc' }, { type: 'asc' }],
+    });
+  }
+
   async getByStudent(studentId: string, date?: string) {
     const where: Record<string, unknown> = { studentId };
     if (date) where.date = new Date(date);

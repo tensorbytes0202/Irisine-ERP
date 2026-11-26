@@ -13,6 +13,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { DiaryService } from './diary.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { isFamily } from '../auth/access-policy';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Diary')
@@ -47,7 +48,9 @@ export class DiaryController {
     @Query('classId') classId: string,
     @Query('date') date: string,
     @Query('sectionId') sectionId?: string,
+    @CurrentUser() user?: { sub: string; role: string },
   ) {
+    if (user && isFamily(user.role)) return this.diaryService.getForFamily(user, date);
     if (classId && date) {
       return this.diaryService.getByClassAndDate(classId, date, sectionId);
     }

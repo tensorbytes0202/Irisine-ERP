@@ -25,7 +25,26 @@ const ALLOWED_EXTENSIONS = new Set([
   'jpg', 'jpeg', 'png', 'gif', 'webp',
 ]);
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB
+// Uploads are held in memory, so the cap must be one the server can survive many times at once.
+const MAX_FILE_SIZE = (Number(process.env.UPLOAD_MAX_MB) || 200) * 1024 * 1024;
+
+/** The type is decided by the server from the extension, never trusted from the client. */
+const MIME_BY_EXT: Record<string, string> = {
+  pdf: 'application/pdf', doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  mp4: 'video/mp4', mp3: 'audio/mpeg', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+  png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+};
+/** First bytes of the formats that have a fixed signature: a renamed .html must not pass as .png. */
+const MAGIC: Record<string, number[][]> = {
+  pdf: [[0x25, 0x50, 0x44, 0x46]], png: [[0x89, 0x50, 0x4e, 0x47]], gif: [[0x47, 0x49, 0x46, 0x38]],
+  jpg: [[0xff, 0xd8, 0xff]], jpeg: [[0xff, 0xd8, 0xff]],
+  docx: [[0x50, 0x4b]], pptx: [[0x50, 0x4b]], doc: [[0xd0, 0xcf, 0x11, 0xe0]], ppt: [[0xd0, 0xcf, 0x11, 0xe0]],
+};
+export const matchesSignature = (ext: string, buf: Buffer) =>
+  !MAGIC[ext] || MAGIC[ext].some((sig) => sig.every((b, i) => buf[i] === b));
 
 /** Every school's files live under its own folder. Clients only ever see paths inside it. */
 const folderOf = (schoolId: string) => `schools/${schoolId}/`;
@@ -70,7 +89,7 @@ export class FileUploadController {
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException('File exceeds the 2 GB limit');
+      throw new BadRequestException('File exceeds the size limit');
     }
 
     // Validate extension
@@ -81,15 +100,20 @@ export class FileUploadController {
       );
     }
 
+    if (!matchesSignature(ext, file.buffer)) {
+      throw new BadRequestException('File content does not match its extension');
+    }
+
     const uniqueName = `${folder ? folder.replace(/\/$/, '') + '/' : ''}${randomUUID()}.${ext}`;
 
-    const url = await this.fileUploadService.uploadFile(file.buffer, inside(schoolId, uniqueName), file.mimetype);
+    const mimeType = MIME_BY_EXT[ext];
+    const url = await this.fileUploadService.uploadFile(file.buffer, inside(schoolId, uniqueName), mimeType);
 
     return {
       success: true,
       fileName: uniqueName,
       originalName: file.originalname,
-      mimeType: file.mimetype,
+      mimeType,
       size: file.size,
       url,
     };

@@ -48,8 +48,9 @@ export class GrievancesService {
     category?: string;
     priority?: string;
     assignedTo?: string;
+    submittedBy?: string;
   }) {
-    const { schoolId, status, category, priority, assignedTo } = filters;
+    const { schoolId, status, category, priority, assignedTo, submittedBy } = filters;
     return this.prisma.grievance.findMany({
       where: {
         schoolId,
@@ -57,6 +58,7 @@ export class GrievancesService {
         ...(category && { category }),
         ...(priority && { priority }),
         ...(assignedTo && { assignedTo }),
+        ...(submittedBy && { submittedBy }),
       },
       orderBy: [{ createdAt: 'desc' }],
     });

@@ -12,6 +12,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { GrievancesService } from './grievances.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { isFamily } from '../auth/access-policy';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Grievances')
@@ -45,8 +46,10 @@ export class GrievancesController {
     @Query('category') category?: string,
     @Query('priority') priority?: string,
     @Query('assignedTo') assignedTo?: string,
+    @CurrentUser() user?: { sub: string; role: string },
   ) {
-    return this.grievancesService.findAll({ schoolId, status, category, priority, assignedTo });
+    const submittedBy = user && isFamily(user.role) ? user.sub : undefined;
+    return this.grievancesService.findAll({ schoolId, status, category, priority, assignedTo, submittedBy });
   }
 
   @Get('stats')

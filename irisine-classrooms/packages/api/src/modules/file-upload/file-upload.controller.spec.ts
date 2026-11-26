@@ -20,12 +20,23 @@ describe('files are kept per school', () => {
     controller = new FileUploadController(service);
   });
 
-  const file = { originalname: 'a.pdf', size: 1, buffer: Buffer.from('x'), mimetype: 'application/pdf' } as any;
+  const file = { originalname: 'a.pdf', size: 1, buffer: Buffer.from('%PDF-1.4'), mimetype: 'application/pdf' } as any;
 
   it("uploads into the school's own folder and answers with the short name", async () => {
     const res = await controller.uploadFile('s1', file, 'notes');
     expect(service.uploadFile.mock.calls[0][1]).toMatch(/^schools\/s1\/notes\/[\w-]+\.pdf$/);
     expect(res.fileName).toMatch(/^notes\/[\w-]+\.pdf$/);
+  });
+
+  it('refuses a file whose content does not match its extension', async () => {
+    const fake = { ...file, originalname: 'a.png', buffer: Buffer.from('<html><script>alert(1)</script>') };
+    await expect(controller.uploadFile('s1', fake, 'notes')).rejects.toThrow(BadRequestException);
+    expect(service.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('stores the type the server decided, not the one the client claimed', async () => {
+    await controller.uploadFile('s1', { ...file, mimetype: 'text/html' }, 'notes');
+    expect(service.uploadFile.mock.calls[0][2]).toBe('application/pdf');
   });
 
   it('lists only that folder, without showing the school prefix', async () => {

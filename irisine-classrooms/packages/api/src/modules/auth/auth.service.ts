@@ -16,6 +16,8 @@ import { Portal, portalForRole } from './portals';
 import { OtpService, OtpPurpose } from './otp.service';
 import { randomUUID } from 'crypto';
 
+const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 10);
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -30,12 +32,9 @@ export class AuthService {
       where: { email: dto.email.trim().toLowerCase() },
     });
 
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!passwordValid) {
+    // Always run one bcrypt compare, so an unknown email takes as long as a wrong password.
+    const passwordValid = await bcrypt.compare(dto.password, user?.passwordHash ?? DUMMY_HASH);
+    if (!user || !user.isActive || !passwordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 

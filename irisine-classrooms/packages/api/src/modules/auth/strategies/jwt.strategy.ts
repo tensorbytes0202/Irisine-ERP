@@ -6,6 +6,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { isItAdminRoute } from '../it-admin-scope';
 import { isPlatformOwner } from '../platform-owner';
 import { tenantContext } from '../../../prisma/tenant-context';
+import { enforceAccess } from '../access-guard';
 
 /**
  * Every request re-checks the account in the database, so a deactivated user, a changed role
@@ -34,6 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
     const isOwner = isPlatformOwner(user, this.config.get<string>('PLATFORM_OWNER_EMAILS'));
     tenantContext.setSchool(user.schoolId, user.id); // from here on queries see this school only
+    await enforceAccess(this.prisma, req, { sub: user.id, role: user.role });
     return { sub: user.id, email: user.email, role: user.role, schoolId: user.schoolId, isOwner };
   }
 }

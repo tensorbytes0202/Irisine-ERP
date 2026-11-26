@@ -110,8 +110,11 @@ import { PlatformModule } from './modules/platform/platform.module';
 // Audit
 import { AuditModule } from './modules/audit/audit.module';
 
+import { StatusController } from './common/status.controller';
+
 @Module({
   providers: [{ provide: APP_FILTER, useClass: PrismaErrorsFilter }],
+  controllers: [StatusController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,

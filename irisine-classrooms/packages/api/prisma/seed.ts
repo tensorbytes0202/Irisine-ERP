@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { FEATURE_CATALOG } from '../src/modules/platform/feature-catalog';
 
 const prisma = new PrismaClient();
 
@@ -260,6 +261,22 @@ async function main() {
     });
     console.log('Created 1 completed academic transition record (2025-26 → 2026-27)');
   }
+
+  // The demo school gets every module (a new school starts with none, until the IT Admin grants them).
+  for (const f of FEATURE_CATALOG) {
+    await prisma.feature.upsert({
+      where: { key: f.key },
+      create: { key: f.key, name: f.name, category: f.category, isCore: !!f.isCore },
+      update: {},
+    });
+    if (f.isCore) continue;
+    await prisma.schoolFeature.upsert({
+      where: { schoolId_featureKey: { schoolId: school.id, featureKey: f.key } },
+      create: { schoolId: school.id, featureKey: f.key, enabled: true },
+      update: { enabled: true },
+    });
+  }
+  console.log(`Granted ${FEATURE_CATALOG.filter((f) => !f.isCore).length} modules to the demo school`);
 
   console.log('Seed complete!');
   console.log(`School: ${school.name} (${school.id})`);
