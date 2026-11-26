@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -27,7 +27,7 @@ export class DashboardController {
   }
 
   @Get('student-stats')
-  getStudentStats(@CurrentUser('sub') userId: string) {
-    return this.dashboardService.getStudentStats(userId);
+  getStudentStats(@CurrentUser('sub') userId: string, @Query('day') day?: string) {
+    return this.dashboardService.getStudentStats(userId, day);
   }
 }

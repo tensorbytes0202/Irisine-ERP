@@ -1,4 +1,7 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
+import { tenantContext } from './prisma/tenant-context';
+import { PrismaErrorsFilter } from './prisma/prisma-errors.filter';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -108,6 +111,7 @@ import { PlatformModule } from './modules/platform/platform.module';
 import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
+  providers: [{ provide: APP_FILTER, useClass: PrismaErrorsFilter }],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
@@ -219,4 +223,9 @@ import { AuditModule } from './modules/audit/audit.module';
     NotificationTriggersModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // each request gets its own context; JwtStrategy then sets the caller's school in it
+    consumer.apply((_req: unknown, _res: unknown, next: () => void) => tenantContext.run(next)).forRoutes('*');
+  }
+}

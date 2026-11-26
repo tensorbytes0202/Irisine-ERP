@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 import { EmailService } from '../email/email.service';
 
 export const INVITE_HOURS = 72;
@@ -26,12 +27,19 @@ export class InvitesService {
     return randomBytes(24).toString('hex');
   }
 
-  /** Cancel older invites for the user and create a new one. Returns the raw token (emailed, never stored). */
+  /**
+   * Cancel older invites for the user and create a new one. Returns the raw token (emailed, never stored).
+   * The caller must already have made sure the user is theirs to invite.
+   */
   async issue(userId: string, client: Pick<PrismaService, 'accountInvite'> = this.prisma) {
     const token = randomBytes(32).toString('hex');
-    await client.accountInvite.updateMany({ where: { userId, usedAt: null }, data: { usedAt: new Date() } });
-    await client.accountInvite.create({
-      data: { userId, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + INVITE_HOURS * 3600_000) },
+    // not filtered by school: the user is verified by the caller, and filtering would cost a
+    // second database connection when this runs inside a transaction
+    await tenantContext.allSchools(async () => {
+      await client.accountInvite.updateMany({ where: { userId, usedAt: null }, data: { usedAt: new Date() } });
+      await client.accountInvite.create({
+        data: { userId, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + INVITE_HOURS * 3600_000) },
+      });
     });
     return token;
   }
@@ -48,8 +56,8 @@ export class InvitesService {
 <p>An account was created for you at <b>${safeName}</b>. Set your password to get started:</p>
 <p><a href="${link}">${link}</a></p><p>This link works once and expires in ${INVITE_HOURS} hours.</p>`;
     try {
-      await this.email.sendEmail(to, subject, html);
-      return true;
+      // false only when email is not set up; the caller then hands the link over itself
+      return (await this.email.sendEmail(to, subject, html)) !== false;
     } catch {
       this.logger.error('Invite email could not be delivered');
       return false;

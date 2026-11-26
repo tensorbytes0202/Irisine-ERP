@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Plus, X, Search } from 'lucide-react';
+import { LoginLink, LoginLinkBox } from '@/components/login-link';
 
 interface StudentRow {
   id: string;
@@ -15,6 +16,9 @@ interface StudentRow {
 
 interface ClassOption { id: string; name: string; grade: number; }
 interface SectionOption { id: string; name: string; }
+
+/** Roles the API lets make student login links. */
+const LINK_ROLES = ['SUPER_ADMIN', 'IT_ADMIN', 'ACADEMIC_COORDINATOR'];
 
 const EMPTY_FORM = {
   admissionNo: '', firstName: '', lastName: '', email: '',
@@ -38,6 +42,15 @@ export default function StudentsPage() {
   const [filterClassId, setFilterClassId] = useState('');
   const [filterSectionId, setFilterSectionId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loginLink, setLoginLink] = useState<LoginLink | null>(null);
+  const [linkError, setLinkError] = useState('');
+  const [canLink, setCanLink] = useState(false);
+
+  useEffect(() => {
+    try {
+      setCanLink(LINK_ROLES.includes(JSON.parse(localStorage.getItem('user') || '{}').role));
+    } catch {}
+  }, []);
 
   const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
   const base = process.env.NEXT_PUBLIC_API_URL;
@@ -135,10 +148,25 @@ export default function StudentsPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ ...form, schoolId, academicSessionId }),
       });
-      if (res.ok) { setShowForm(false); setForm(EMPTY_FORM); fetchStudents(); }
+      if (res.ok) {
+        const added = await res.json().catch(() => ({}));
+        if (added?.inviteLink) setLoginLink({ name: `${form.firstName} ${form.lastName}`.trim(), link: added.inviteLink, emailSent: !!added.inviteEmailSent });
+        setShowForm(false); setForm(EMPTY_FORM); fetchStudents();
+      }
       else { const data = await res.json().catch(() => ({})); setError(data?.message ?? `Error ${res.status}`); }
     } catch { setError('Network error.'); }
     finally { setSubmitting(false); }
+  }
+
+  async function makeLink(s: StudentRow) {
+    setLinkError(''); setLoginLink(null);
+    try {
+      const res = await fetch(`/api/v1/students/${s.id}/login-link`, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return setLinkError(data?.message ?? `Error ${res.status}`);
+      setLoginLink({ name: `${s.user.firstName} ${s.user.lastName}`, link: data.inviteLink, emailSent: !!data.inviteEmailSent });
+      window.scrollTo?.({ top: 0, behavior: 'smooth' });
+    } catch { setLinkError('Network error.'); }
   }
 
   return (
@@ -151,6 +179,9 @@ export default function StudentsPage() {
           {showForm ? 'Cancel' : 'Add Student'}
         </button>
       </div>
+
+      {linkError && <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded text-sm">{linkError}</div>}
+      {loginLink && <LoginLinkBox key={loginLink.link} {...loginLink} onClose={() => setLoginLink(null)} />}
 
       {showForm && (
         <div className="bg-card rounded-lg border p-6 mb-6">
@@ -224,7 +255,7 @@ export default function StudentsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-card rounded-lg border overflow-hidden">
+      <div className="bg-card rounded-lg border overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-muted">
             <tr>
@@ -234,11 +265,12 @@ export default function StudentsPage() {
               <th className="text-left p-3 font-medium">Class</th>
               <th className="text-left p-3 font-medium">Section</th>
               <th className="text-left p-3 font-medium">Email</th>
+              {canLink && <th className="text-left p-3 font-medium">Login</th>}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">
+              <tr><td colSpan={canLink ? 7 : 6} className="p-8 text-center text-muted-foreground">
                 {students.length === 0 ? 'No students found. Select a class or add a student.' : 'No matching students.'}
               </td></tr>
             ) : (
@@ -254,6 +286,11 @@ export default function StudentsPage() {
                   <td className="p-3">{s.class.name}</td>
                   <td className="p-3">{s.section.name}</td>
                   <td className="p-3 text-muted-foreground">{s.user.email}</td>
+                  {canLink && (
+                    <td className="p-3 whitespace-nowrap">
+                      <button type="button" onClick={() => makeLink(s)} className="text-primary hover:underline">Login link</button>
+                    </td>
+                  )}
                 </tr>
               ))
             )}

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 
 @Injectable()
 export class StaffDirectoryService {
@@ -23,7 +24,7 @@ export class StaffDirectoryService {
     const existingUser = await this.prisma.staffProfile.findUnique({ where: { userId: data.userId } });
     if (existingUser) throw new ConflictException('Staff profile already exists for this user');
 
-    const existingEmpId = await this.prisma.staffProfile.findUnique({ where: { employeeId: data.employeeId } });
+    const existingEmpId = await tenantContext.allSchools(() => this.prisma.staffProfile.findUnique({ where: { employeeId: data.employeeId } }));
     if (existingEmpId) throw new ConflictException('Employee ID already in use');
 
     return this.prisma.staffProfile.create({

@@ -28,6 +28,12 @@ export class StudentsController {
     return this.studentsService.create(dto, actor);
   }
 
+  @Post(':id/login-link')
+  @Roles('SUPER_ADMIN', 'IT_ADMIN', 'ACADEMIC_COORDINATOR')
+  loginLink(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.studentsService.loginLink(id, actor);
+  }
+
   @Get()
   @Roles('SUPER_ADMIN', 'ADMIN', 'IT_ADMIN', 'DIRECTOR', 'PRINCIPAL', 'ACADEMIC_COORDINATOR', 'CLASS_TEACHER', 'SUBJECT_TEACHER', 'ACCOUNTANT')
   findAll(

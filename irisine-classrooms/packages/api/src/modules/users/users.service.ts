@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -39,7 +40,7 @@ export class UsersService {
     this.assertMayManage(actor, dto.role);
     if (FACULTY_ROLES.includes(dto.role)) await this.limits.assertCanAddFaculty(actor.schoolId);
     const email = dto.email.trim().toLowerCase();
-    if (await this.prisma.user.findUnique({ where: { email } })) {
+    if (await tenantContext.allSchools(() => this.prisma.user.findUnique({ where: { email } }))) {
       throw new ConflictException('A user with this email already exists');
     }
     const passwordHash = await bcrypt.hash(dto.password, 10);

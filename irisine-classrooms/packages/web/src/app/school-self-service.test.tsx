@@ -24,7 +24,9 @@ beforeEach(() => {
     calls.push({ method, url, body: init.body && JSON.parse(init.body) });
     // longest matching ending wins, so "/schools/school-1/people" is not read as "/schools/school-1"
     const path = url.split('?')[0];
-    const key = Object.keys(data).filter((k) => path.endsWith(k)).sort((a, b) => b.length - a.length)[0];
+    // a key may name the method: "POST /students"
+    const matches = (k: string) => (k.includes(' ') ? k.startsWith(`${method} `) && path.endsWith(k.split(' ')[1]) : path.endsWith(k));
+    const key = Object.keys(data).filter(matches).sort((a, b) => b.length - a.length)[0];
     return { ok: true, status: method === 'POST' ? 201 : 200, json: async () => (key ? data[key] : []) };
   }));
   vi.stubGlobal('localStorage', {
@@ -84,6 +86,43 @@ describe('the student form says what is missing', () => {
     await screen.findAllByRole('option', { name: 'Class 1' });
     fireEvent.change(document.querySelector('select[name="classId"]')!, { target: { value: 'c1' } });
     expect(await screen.findByText(/This class has no section yet/)).toBeTruthy();
+  });
+});
+
+describe('student login links', () => {
+  const row = { id: 'st1', admissionNo: 'GV-1', user: { firstName: 'Ravi', lastName: 'Kumar', email: 'ravi@x.test' }, class: { id: 'c1', name: 'Class 1' }, section: { id: 's1', name: 'A' } };
+  const as = (role: string) => vi.stubGlobal('localStorage', {
+    setItem: vi.fn(), removeItem: vi.fn(),
+    getItem: (k: string) => (k === 'user' ? JSON.stringify({ id: 'me', role }) : 'token'),
+  });
+
+  it('the school gets a link for a listed student', async () => {
+    data = { '/students': [row], '/students/st1/login-link': { inviteLink: 'http://x.test/accept-invite?token=abc', inviteEmailSent: false } };
+    render(<StudentsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Login link' }));
+    expect(await screen.findByText('http://x.test/accept-invite?token=abc')).toBeTruthy();
+    expect(calls.find((c) => c.method === 'POST')?.url).toMatch(/\/students\/st1\/login-link$/);
+  });
+
+  it('shows the link right after a student is added', async () => {
+    data = {
+      '/classes': [{ id: 'c1', name: 'Class 1', grade: 1 }],
+      '/academic-sessions': [{ id: 's1', status: 'ACTIVE' }],
+      'POST /students': { id: 'st2', inviteLink: 'http://x.test/accept-invite?token=new', inviteEmailSent: false },
+    };
+    render(<StudentsPage />);
+    fireEvent.click(screen.getByRole('button', { name: /Add Student/ }));
+    await screen.findAllByRole('option', { name: 'Class 1' });
+    fireEvent.submit(document.querySelector('form')!);
+    expect(await screen.findByText('http://x.test/accept-invite?token=new')).toBeTruthy();
+  });
+
+  it('is not offered to a teacher', async () => {
+    as('CLASS_TEACHER');
+    data = { '/students': [row] };
+    render(<StudentsPage />);
+    await screen.findByText('GV-1');
+    expect(screen.queryByRole('button', { name: 'Login link' })).toBeNull();
   });
 });
 

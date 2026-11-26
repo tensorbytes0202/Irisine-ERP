@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 
 @Injectable()
 export class GrievancesService {
@@ -11,9 +12,9 @@ export class GrievancesService {
 
   private async generateTicketNumber(): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await this.prisma.grievance.count({
+    const count = await tenantContext.allSchools(() => this.prisma.grievance.count({
       where: { ticketNumber: { startsWith: `GRV-${year}-` } },
-    });
+    }));
     const seq = String(count + 1).padStart(4, '0');
     return `GRV-${year}-${seq}`;
   }

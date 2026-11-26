@@ -4,7 +4,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { InvitesService } from '../platform/invites.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 import { CreateEnquiryDto } from './dto/create-enquiry.dto';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { ProcessApplicationDto } from './dto/process-application.dto';
@@ -49,9 +51,9 @@ export class AdmissionService {
     const year = new Date().getFullYear();
     const prefix = `APP-${year}-`;
     // Count existing applications this year to get next sequence
-    const count = await this.prisma.admissionApplication.count({
+    const count = await tenantContext.allSchools(() => this.prisma.admissionApplication.count({
       where: { formNumber: { startsWith: prefix } },
-    });
+    }));
     const seq = String(count + 1).padStart(4, '0');
     return `${prefix}${seq}`;
   }
@@ -133,16 +135,18 @@ export class AdmissionService {
 
       // Build email from name + admissionNo
       const emailBase = `${application.studentFirstName.toLowerCase()}.${application.studentLastName.toLowerCase()}`;
-      const email = `${emailBase}.${admissionNo.replace(/[^a-z0-9]/gi, '').toLowerCase()}@school.local`;
-
-      const passwordHash = await bcrypt.hash('student@123', 10);
+      // nobody knows this password: the school hands the student a login link instead
+      const passwordHash = await bcrypt.hash(InvitesService.unusablePasswordSeed(), 10);
 
       // Need a schoolId — fetch from academic session
       const session = await tx.academicSession.findUnique({
         where: { id: application.academicSessionId },
-        select: { schoolId: true },
+        select: { id: true, schoolId: true },
       });
       if (!session) throw new NotFoundException('Academic session not found');
+
+      // two schools can both have admission number 0001, so the address carries part of the school id
+      const email = `${emailBase}.${admissionNo.replace(/[^a-z0-9]/gi, '').toLowerCase()}.${session.schoolId.slice(0, 8)}@school.local`;
 
       // Create user
       const user = await tx.user.create({
@@ -162,8 +166,10 @@ export class AdmissionService {
           name: application.classAppliedFor,
           schoolId: session.schoolId,
         },
-        include: { sections: { take: 1 } },
       });
+      const sectionRecord = classRecord
+        ? await tx.section.findFirst({ where: { classId: classRecord.id } })
+        : null;
 
       // Create student record
       const student = await tx.student.create({
@@ -171,7 +177,7 @@ export class AdmissionService {
           admissionNo,
           userId: user.id,
           classId: classRecord?.id ?? '',
-          sectionId: classRecord?.sections?.[0]?.id ?? '',
+          sectionId: sectionRecord?.id ?? '',
           dateOfBirth: application.dateOfBirth,
           gender: application.gender,
           addressLine1: application.addressLine1 ?? undefined,

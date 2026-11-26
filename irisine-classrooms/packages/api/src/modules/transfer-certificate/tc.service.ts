@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 
 @Injectable()
 export class TcService {
@@ -7,9 +8,9 @@ export class TcService {
 
   private async generateTcNumber(): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await this.prisma.transferCertificate.count({
+    const count = await tenantContext.allSchools(() => this.prisma.transferCertificate.count({
       where: { tcNumber: { startsWith: `TC-${year}-` } },
-    });
+    }));
     const seq = String(count + 1).padStart(4, '0');
     return `TC-${year}-${seq}`;
   }

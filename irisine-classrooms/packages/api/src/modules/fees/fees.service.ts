@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { UpdateDefaulterDto } from './dto/update-defaulter.dto';
@@ -68,9 +69,9 @@ export class FeesService {
     await this.tenant.feeHeadInSchool(dto.feeHeadId, actor.schoolId);
     await this.tenant.studentInSchool(dto.studentId, actor.schoolId);
     // Check if receipt number is unique
-    const existing = await this.prisma.payment.findUnique({
+    const existing = await tenantContext.allSchools(() => this.prisma.payment.findUnique({
       where: { receiptNo: dto.receiptNo },
-    });
+    }));
     if (existing) {
       throw new BadRequestException(`Receipt number ${dto.receiptNo} already exists`);
     }

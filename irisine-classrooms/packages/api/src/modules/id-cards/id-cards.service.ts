@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 import { GenerateIdCardDto } from './dto/generate-id-card.dto';
 
 @Injectable()
@@ -24,7 +25,7 @@ export class IdCardsService {
     let cardNumber = this.generateCardNumber();
     let attempt = 0;
     while (attempt < 5) {
-      const exists = await this.prisma.idCard.findUnique({ where: { cardNumber } });
+      const exists = await tenantContext.allSchools(() => this.prisma.idCard.findUnique({ where: { cardNumber } }));
       if (!exists) break;
       cardNumber = this.generateCardNumber();
       attempt++;
@@ -55,7 +56,7 @@ export class IdCardsService {
         let cardNumber = this.generateCardNumber();
         let attempt = 0;
         while (attempt < 5) {
-          const exists = await this.prisma.idCard.findUnique({ where: { cardNumber } });
+          const exists = await tenantContext.allSchools(() => this.prisma.idCard.findUnique({ where: { cardNumber } }));
           if (!exists) break;
           cardNumber = this.generateCardNumber();
           attempt++;

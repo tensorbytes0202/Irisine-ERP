@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { isPathEnabled } from '@/lib/features';
@@ -362,52 +362,43 @@ function ParentDashboard() {
 }
 
 function StudentDashboard() {
-  const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
-  const [enhanced, setEnhanced] = useState<StudentStats | null>(null);
+  const [stats, setStats] = useState<StudentStats | null>(null);
+  const [problem, setProblem] = useState<'load' | 'no-record' | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchData() {
-      const token = localStorage.getItem('accessToken');
-      const headers = { Authorization: `Bearer ${token}` };
-      try {
-        const [ttRes, asRes, atRes, enhRes] = await Promise.allSettled([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/timetable/my`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/assignments/my`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/attendance/my/summary`, { headers }),
-          fetch(apiUrl('/dashboard/student-stats'), { headers }),
-        ]);
-
-        if (ttRes.status === 'fulfilled' && ttRes.value.ok)
-          setTimetable(await ttRes.value.json());
-        if (asRes.status === 'fulfilled' && asRes.value.ok)
-          setAssignments(await asRes.value.json());
-        if (atRes.status === 'fulfilled' && atRes.value.ok)
-          setAttendance(await atRes.value.json());
-        if (enhRes.status === 'fulfilled' && enhRes.value.ok)
-          setEnhanced(await enhRes.value.json());
-      } catch {
-        // silently fail
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setProblem(null);
+    const data = await fetchApi<StudentStats & { error?: string }>(`/dashboard/student-stats?day=${new Date().getDay()}`);
+    if (!data) setProblem('load');
+    else if (data.error) setProblem('no-record');
+    else setStats(data);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   if (loading) return <div className="text-muted-foreground">Loading your dashboard...</div>;
 
+  if (problem || !stats) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold mb-6">Student Dashboard</h1>
+        <div role="alert" className="bg-destructive/10 text-destructive text-sm p-3 rounded">
+          {problem === 'no-record'
+            ? 'Your student record is not set up yet. Please contact your school.'
+            : 'Could not load your dashboard. Please check your connection.'}
+        </div>
+        {problem !== 'no-record' && (
+          <button onClick={load} className="mt-4 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">Try again</button>
+        )}
+      </div>
+    );
+  }
+
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const today = days[new Date().getDay() - 1] || '';
-  const todayClasses = timetable.filter((t) => t.day === today);
-
-  const attendancePercent = enhanced?.attendance?.percent ?? (
-    attendance && attendance.total > 0
-      ? Math.round((attendance.present / attendance.total) * 100)
-      : 0
-  );
+  const attendancePercent = stats.attendance.percent;
   const attendanceColor = attendancePercent >= 75 ? 'text-green-600' : attendancePercent >= 50 ? 'text-yellow-600' : 'text-red-600';
   const attendanceBg = attendancePercent >= 75 ? 'bg-green-500' : attendancePercent >= 50 ? 'bg-yellow-500' : 'bg-red-500';
 
@@ -419,9 +410,9 @@ function StudentDashboard() {
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-3 text-muted-foreground">My Attendance</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-          <StatCard label="Present" value={enhanced?.attendance?.present ?? attendance?.present ?? 0} icon={CheckCircle} color="text-green-600" bg="bg-green-50" />
-          <StatCard label="Absent" value={enhanced?.attendance?.absent ?? attendance?.absent ?? 0} icon={AlertTriangle} color="text-red-600" bg="bg-red-50" />
-          <StatCard label="Late" value={enhanced?.attendance?.late ?? 0} icon={Clock} color="text-yellow-600" bg="bg-yellow-50" />
+          <StatCard label="Present" value={stats.attendance.present} icon={CheckCircle} color="text-green-600" bg="bg-green-50" />
+          <StatCard label="Absent" value={stats.attendance.absent} icon={AlertTriangle} color="text-red-600" bg="bg-red-50" />
+          <StatCard label="Late" value={stats.attendance.late} icon={Clock} color="text-yellow-600" bg="bg-yellow-50" />
           <div className="bg-card rounded-lg border p-4 flex items-center gap-4">
             <div className={`p-3 rounded-lg ${attendancePercent >= 75 ? 'bg-green-50' : attendancePercent >= 50 ? 'bg-yellow-50' : 'bg-red-50'}`}>
               <Target className={`h-5 w-5 ${attendanceColor}`} />
@@ -436,11 +427,11 @@ function StudentDashboard() {
       </div>
 
       {/* Performance Overview - Subject grades as horizontal bars */}
-      {enhanced?.subjectGrades && enhanced.subjectGrades.length > 0 && (
+      {stats.subjectGrades.length > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Performance Overview</h2>
           <div className="bg-card rounded-lg border p-4 space-y-3">
-            {enhanced.subjectGrades.map((sg) => (
+            {stats.subjectGrades.map((sg) => (
               <div key={sg.subject} className="flex items-center gap-3">
                 <span className="text-sm font-medium w-28 truncate" title={sg.subject}>{sg.subject}</span>
                 <div className="flex-1 bg-muted rounded-full h-5 relative">
@@ -460,11 +451,11 @@ function StudentDashboard() {
       )}
 
       {/* Upcoming Deadlines */}
-      {enhanced?.deadlines && enhanced.deadlines.length > 0 && (
-        <div className="mb-8">
+      <div className="mb-8">
           <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Upcoming Deadlines</h2>
+          {stats.deadlines.length === 0 && <p className="text-muted-foreground text-sm">Nothing due soon.</p>}
           <div className="space-y-2">
-            {enhanced.deadlines.map((d) => {
+            {stats.deadlines.map((d) => {
               const countdown = daysUntil(d.dueDate);
               const isUrgent = countdown === 'Today' || countdown === 'Tomorrow' || countdown === 'Overdue';
               return (
@@ -488,18 +479,17 @@ function StudentDashboard() {
               );
             })}
           </div>
-        </div>
-      )}
+      </div>
 
       {/* My Achievements */}
-      {isPathEnabled('/gamification') && enhanced?.achievements && (
+      {isPathEnabled('/gamification') && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-3 text-muted-foreground">My Achievements</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <StatCard label="Badges" value={enhanced.achievements.badgeCount} icon={Award} color="text-yellow-600" bg="bg-yellow-50" />
-            <StatCard label="Total Points" value={enhanced.achievements.totalPoints} icon={Star} color="text-amber-600" bg="bg-amber-50" />
-            <StatCard label="Level" value={enhanced.achievements.level} icon={TrendingUp} color="text-primary" bg="bg-primary/5" />
-            <StatCard label="Rank" value={enhanced.achievements.rank ?? '—'} icon={Trophy} color="text-primary" bg="bg-primary/5" />
+            <StatCard label="Badges" value={stats.achievements.badgeCount} icon={Award} color="text-yellow-600" bg="bg-yellow-50" />
+            <StatCard label="Total Points" value={stats.achievements.totalPoints} icon={Star} color="text-amber-600" bg="bg-amber-50" />
+            <StatCard label="Level" value={stats.achievements.level} icon={TrendingUp} color="text-primary" bg="bg-primary/5" />
+            <StatCard label="Rank" value={stats.achievements.rank ?? '—'} icon={Trophy} color="text-primary" bg="bg-primary/5" />
           </div>
         </div>
       )}
@@ -509,9 +499,9 @@ function StudentDashboard() {
         <h2 className="text-lg font-semibold mb-3 text-muted-foreground">
           Today&apos;s Schedule {today ? `(${today})` : ''}
         </h2>
-        {(enhanced?.todaySchedule && enhanced.todaySchedule.length > 0) ? (
+        {stats.todaySchedule.length > 0 ? (
           <div className="space-y-2">
-            {enhanced.todaySchedule.map((entry) => (
+            {stats.todaySchedule.map((entry) => (
               <div key={entry.id} className="flex items-center gap-4 bg-card rounded-lg border px-4 py-3 text-sm">
                 <span className="text-muted-foreground w-32">{entry.startTime} – {entry.endTime}</span>
                 <span className="font-medium">{entry.subject}</span>
@@ -522,64 +512,32 @@ function StudentDashboard() {
               </div>
             ))}
           </div>
-        ) : todayClasses.length > 0 ? (
-          <div className="space-y-2">
-            {todayClasses.map((entry) => (
-              <div key={entry.id} className="flex items-center gap-4 bg-card rounded-lg border px-4 py-3 text-sm">
-                <span className="text-muted-foreground w-32">{entry.startTime} – {entry.endTime}</span>
-                <span className="font-medium">{entry.subject?.name || '—'}</span>
-                {entry.teacher && (
-                  <span className="text-muted-foreground ml-auto">
-                    {entry.teacher.firstName} {entry.teacher.lastName}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
         ) : (
           <p className="text-muted-foreground text-sm">No classes scheduled for today.</p>
         )}
       </div>
 
       {/* Learning Progress */}
-      {enhanced?.learningProgress && (enhanced.learningProgress.moduleItems > 0 || enhanced.learningProgress.paths.length > 0) && (
+      {(stats.learningProgress.moduleItems > 0 || stats.learningProgress.paths.length > 0) && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Learning Progress</h2>
           <div className="bg-card rounded-lg border p-4 space-y-4">
-            {enhanced.learningProgress.moduleItems > 0 && (
+            {stats.learningProgress.moduleItems > 0 && (
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="font-medium">Course Modules</span>
-                  <span className="text-muted-foreground">{enhanced.learningProgress.completed}/{enhanced.learningProgress.moduleItems} completed</span>
+                  <span className="text-muted-foreground">{stats.learningProgress.completed}/{stats.learningProgress.moduleItems} completed</span>
                 </div>
-                <ProgressBar value={enhanced.learningProgress.completed} max={enhanced.learningProgress.moduleItems} color="bg-primary" />
+                <ProgressBar value={stats.learningProgress.completed} max={stats.learningProgress.moduleItems} color="bg-primary" />
               </div>
             )}
-            {enhanced.learningProgress.paths.map((path) => (
+            {stats.learningProgress.paths.map((path) => (
               <div key={path.title}>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="font-medium">{path.title}</span>
                   <span className="text-muted-foreground">{path.completedSteps}/{path.totalSteps} steps</span>
                 </div>
                 <ProgressBar value={path.completedSteps} max={path.totalSteps} color="bg-emerald-500" />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Upcoming assignments (original, as fallback) */}
-      {(!enhanced?.deadlines || enhanced.deadlines.length === 0) && assignments.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Upcoming Assignments</h2>
-          <div className="space-y-2">
-            {assignments.slice(0, 8).map((a) => (
-              <div key={a.id} className="flex justify-between bg-card rounded-lg border px-4 py-3 text-sm">
-                <div>
-                  <span className="font-medium">{a.title}</span>
-                  {a.subject && <span className="ml-2 text-muted-foreground">{a.subject.name}</span>}
-                </div>
-                <span className="text-muted-foreground">{new Date(a.dueDate).toLocaleDateString()}</span>
               </div>
             ))}
           </div>

@@ -321,7 +321,8 @@ export class DashboardService {
 
   // ─── Student Stats ───────────────────────────────────────────────
 
-  async getStudentStats(userId: string) {
+  /** `day` is the weekday (0 = Sunday) on the student's own device: the server's clock may be a day off. */
+  async getStudentStats(userId: string, day?: string) {
     // Get student record from userId
     const student = await this.prisma.student.findUnique({
       where: { userId },
@@ -371,6 +372,8 @@ export class DashboardService {
     const upcomingAssignments = await this.prisma.assignment.findMany({
       where: {
         classId: student.classId,
+        // work given to the whole class has no section
+        OR: [{ sectionId: null }, { sectionId: '' }, { sectionId: student.sectionId }],
         dueDate: { gte: new Date() },
         isPublished: true,
       },
@@ -383,6 +386,7 @@ export class DashboardService {
       where: {
         classId: student.classId,
         scheduledDate: { not: null, gte: new Date() },
+        isPublished: true,
       },
       orderBy: { scheduledDate: 'asc' },
       take: 5,
@@ -425,13 +429,18 @@ export class DashboardService {
     const totalPoints = pointsRecords.reduce((sum, p) => sum + p.points, 0);
 
     // Today's schedule
-    const dayOfWeek = new Date().getDay();
+    const dayOfWeek = day && /^[0-6]$/.test(day) ? Number(day) : new Date().getDay();
+    const todayDate = new Date(new Date().toISOString().split('T')[0]);
     const todaySlots = await this.prisma.timetableSlot.findMany({
       where: {
         dayOfWeek,
+        // only the timetable in force: this session, already started and not yet replaced
         timetable: {
           classId: student.classId,
           sectionId: student.sectionId,
+          academicSessionId: student.academicSessionId,
+          effectiveFrom: { lte: todayDate },
+          OR: [{ effectiveTo: null }, { effectiveTo: { gte: todayDate } }],
         },
       },
       include: {

@@ -174,8 +174,8 @@ export class FileUploadService implements OnModuleInit {
   /**
    * Aggregate storage statistics across all files in the bucket.
    */
-  async getStorageStats(): Promise<StorageStats> {
-    const files = await this.listFiles('');
+  async getStorageStats(prefix: string): Promise<StorageStats> {
+    const files = await this.listFiles(prefix);
 
     const stats: StorageStats = {
       totalFiles: 0,

@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 
 @Injectable()
 export class CertificatesService {
@@ -14,9 +15,9 @@ export class CertificatesService {
     const prefix = `CERT-${year}-`;
 
     // Count existing certificates this year to determine the sequence number
-    const count = await this.prisma.certificate.count({
+    const count = await tenantContext.allSchools(() => this.prisma.certificate.count({
       where: { serialNumber: { startsWith: prefix } },
-    });
+    }));
 
     const seq = String(count + 1).padStart(4, '0');
     return `${prefix}${seq}`;

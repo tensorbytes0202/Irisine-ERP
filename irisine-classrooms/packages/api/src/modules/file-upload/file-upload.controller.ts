@@ -15,6 +15,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes, ApiBody, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileUploadService } from './file-upload.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
 
@@ -25,6 +26,14 @@ const ALLOWED_EXTENSIONS = new Set([
 ]);
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB
+
+/** Every school's files live under its own folder. Clients only ever see paths inside it. */
+const folderOf = (schoolId: string) => `schools/${schoolId}/`;
+function inside(schoolId: string, name = '') {
+  if (name.startsWith('/') || name.split(/[\\/]/).includes('..')) throw new BadRequestException('Invalid file path');
+  return folderOf(schoolId) + name;
+}
+const shortName = (schoolId: string, name: string) => name.slice(folderOf(schoolId).length);
 
 @ApiTags('File Upload')
 @ApiBearerAuth()
@@ -51,6 +60,7 @@ export class FileUploadController {
     }),
   )
   async uploadFile(
+    @CurrentUser('schoolId') schoolId: string,
     @UploadedFile() file: Express.Multer.File,
     @Query('folder') folder?: string,
   ) {
@@ -73,7 +83,7 @@ export class FileUploadController {
 
     const uniqueName = `${folder ? folder.replace(/\/$/, '') + '/' : ''}${randomUUID()}.${ext}`;
 
-    const url = await this.fileUploadService.uploadFile(file.buffer, uniqueName, file.mimetype);
+    const url = await this.fileUploadService.uploadFile(file.buffer, inside(schoolId, uniqueName), file.mimetype);
 
     return {
       success: true,
@@ -88,13 +98,13 @@ export class FileUploadController {
   @Get('browse')
   @ApiOperation({ summary: 'Browse files by folder prefix (non-recursive)' })
   @ApiQuery({ name: 'prefix', required: false, description: 'Folder prefix, e.g. class-10/math/videos/' })
-  async browseFiles(@Query('prefix') prefix?: string) {
-    const result = await this.fileUploadService.listByFolder(prefix ?? '');
+  async browseFiles(@CurrentUser('schoolId') schoolId: string, @Query('prefix') prefix?: string) {
+    const result = await this.fileUploadService.listByFolder(inside(schoolId, prefix));
     return {
       prefix: prefix ?? '',
-      folders: result.folders,
+      folders: result.folders.map((f) => shortName(schoolId, f)),
       files: result.files.map((f) => ({
-        name: f.name,
+        name: shortName(schoolId, f.name!),
         size: f.size,
         lastModified: f.lastModified,
         etag: f.etag,
@@ -104,17 +114,17 @@ export class FileUploadController {
 
   @Get('stats')
   @ApiOperation({ summary: 'Storage statistics: total files, total size, breakdown by type' })
-  async getStorageStats() {
-    return this.fileUploadService.getStorageStats();
+  async getStorageStats(@CurrentUser('schoolId') schoolId: string) {
+    return this.fileUploadService.getStorageStats(inside(schoolId));
   }
 
   @Get()
   @ApiOperation({ summary: 'List all files in bucket (recursive)' })
-  async listFiles(@Query('prefix') prefix?: string) {
-    const files = await this.fileUploadService.listFiles(prefix);
+  async listFiles(@CurrentUser('schoolId') schoolId: string, @Query('prefix') prefix?: string) {
+    const files = await this.fileUploadService.listFiles(inside(schoolId, prefix));
     return {
       files: files.map((f) => ({
-        name: f.name,
+        name: shortName(schoolId, f.name!),
         size: f.size,
         lastModified: f.lastModified,
         etag: f.etag,
@@ -125,10 +135,11 @@ export class FileUploadController {
 
   @Get('info/:fileName(*)')
   @ApiOperation({ summary: 'Get metadata for a specific file' })
-  async getFileInfo(@Param('fileName') fileName: string) {
+  async getFileInfo(@CurrentUser('schoolId') schoolId: string, @Param('fileName') fileName: string) {
     if (!fileName) throw new BadRequestException('File name is required');
+    const key = inside(schoolId, fileName);
     try {
-      return await this.fileUploadService.getFileInfo(fileName);
+      return { ...(await this.fileUploadService.getFileInfo(key)), name: fileName };
     } catch {
       throw new NotFoundException(`File "${fileName}" not found`);
     }
@@ -136,13 +147,14 @@ export class FileUploadController {
 
   @Get(':fileName(*)')
   @ApiOperation({ summary: 'Get signed download URL for a file' })
-  async getSignedUrl(@Param('fileName') fileName: string) {
+  async getSignedUrl(@CurrentUser('schoolId') schoolId: string, @Param('fileName') fileName: string) {
     if (!fileName) {
       throw new BadRequestException('File name is required');
     }
+    const key = inside(schoolId, fileName);
 
     try {
-      const url = await this.fileUploadService.getSignedUrl(fileName);
+      const url = await this.fileUploadService.getSignedUrl(key);
       return { fileName, signedUrl: url };
     } catch {
       throw new NotFoundException(`File "${fileName}" not found`);
@@ -151,12 +163,12 @@ export class FileUploadController {
 
   @Delete(':fileName(*)')
   @ApiOperation({ summary: 'Delete a file from MinIO' })
-  async deleteFile(@Param('fileName') fileName: string) {
+  async deleteFile(@CurrentUser('schoolId') schoolId: string, @Param('fileName') fileName: string) {
     if (!fileName) {
       throw new BadRequestException('File name is required');
     }
 
-    await this.fileUploadService.deleteFile(fileName);
+    await this.fileUploadService.deleteFile(inside(schoolId, fileName));
     return { success: true, message: `File "${fileName}" deleted successfully` };
   }
 }

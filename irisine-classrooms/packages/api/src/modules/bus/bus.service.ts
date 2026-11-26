@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { CreateRouteDto } from './dto/create-route.dto';
 import { AssignStudentDto } from './dto/assign-student.dto';
@@ -12,7 +13,7 @@ export class BusService {
   // ─── Vehicles ─────────────────────────────────────────────────────
 
   async createVehicle(dto: CreateVehicleDto, schoolId: string) {
-    const existing = await this.prisma.vehicle.findUnique({ where: { number: dto.number } });
+    const existing = await tenantContext.allSchools(() => this.prisma.vehicle.findUnique({ where: { number: dto.number } }));
     if (existing) throw new ConflictException(`Vehicle with number ${dto.number} already exists`);
 
     return this.prisma.vehicle.create({

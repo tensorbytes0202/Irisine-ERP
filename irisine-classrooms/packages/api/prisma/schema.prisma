@@ -202,7 +202,8 @@ model TeacherSubject {
 
 model Student {
   id                String   @id @default(uuid())
-  admissionNo       String   @unique
+  admissionNo       String   // unique inside a school, see @@unique below
+  schoolId          String?  // filled from the logged-in school; null only on rows made before this column
   userId            String   @unique
   classId           String
   sectionId         String
@@ -242,6 +243,7 @@ model Student {
   boardingLogs      BoardingLog[]
   paymentOrders PaymentOrder[]
 
+  @@unique([schoolId, admissionNo])
   @@map("students")
 }
 

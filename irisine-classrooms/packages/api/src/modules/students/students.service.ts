@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 import { Actor, TenantService } from '../platform/tenant.service';
 import { InvitesService } from '../platform/invites.service';
 import { LimitsService } from '../platform/limits.service';
@@ -23,11 +24,13 @@ export class StudentsService {
     await this.tenant.sessionInSchool(dto.academicSessionId, actor.schoolId);
 
     const email = dto.email.trim().toLowerCase();
-    if (await this.prisma.user.findUnique({ where: { email }, select: { id: true } })) {
+    // emails are unique across the whole platform
+    if (await tenantContext.allSchools(() => this.prisma.user.findUnique({ where: { email }, select: { id: true } }))) {
       throw new ConflictException('A user with this email already exists');
     }
-    // admission numbers are unique across the whole platform (see schema), not just inside one school
-    if (await this.prisma.student.findUnique({ where: { admissionNo: dto.admissionNo }, select: { id: true } })) {
+    // admission numbers only need to be unique inside the school
+    const sameNumber = { admissionNo: dto.admissionNo, user: { schoolId: actor.schoolId } };
+    if (await this.prisma.student.findFirst({ where: sameNumber, select: { id: true } })) {
       throw new ConflictException(`Admission number "${dto.admissionNo}" is already in use. Please use a different one.`);
     }
 
@@ -69,7 +72,21 @@ export class StudentsService {
     });
 
     const inviteEmailSent = await this.invites.send(email, 'your school', token);
-    return { ...student, inviteEmailSent };
+    // the school also gets the link, so a student can be set up when email is not configured
+    return { ...student, inviteEmailSent, inviteLink: this.invites.link(token) };
+  }
+
+  /** A new one-time "set your password" link for one of the school's own students. */
+  async loginLink(id: string, actor: Actor) {
+    const student = await this.prisma.student.findFirst({
+      // student accounts only: a link must never set the password of a staff or admin account
+      where: { id, isActive: true, user: { schoolId: actor.schoolId, role: 'STUDENT', isActive: true } },
+      select: { user: { select: { id: true, email: true } } },
+    });
+    if (!student) throw new NotFoundException('Student not found');
+    const token = await this.invites.issue(student.user.id);
+    const inviteEmailSent = await this.invites.send(student.user.email, 'your school', token);
+    return { inviteEmailSent, inviteLink: this.invites.link(token) };
   }
 
   async findAll(filters: { classId?: string; sectionId?: string; academicSessionId?: string }, actor: Actor) {

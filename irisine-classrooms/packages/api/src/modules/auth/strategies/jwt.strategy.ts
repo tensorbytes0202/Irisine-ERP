@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { isItAdminRoute } from '../it-admin-scope';
 import { isPlatformOwner } from '../platform-owner';
+import { tenantContext } from '../../../prisma/tenant-context';
 
 /**
  * Every request re-checks the account in the database, so a deactivated user, a changed role
@@ -32,6 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new ForbiddenException('The IT Admin account cannot use this module');
     }
     const isOwner = isPlatformOwner(user, this.config.get<string>('PLATFORM_OWNER_EMAILS'));
+    tenantContext.setSchool(user.schoolId, user.id); // from here on queries see this school only
     return { sub: user.id, email: user.email, role: user.role, schoolId: user.schoolId, isOwner };
   }
 }

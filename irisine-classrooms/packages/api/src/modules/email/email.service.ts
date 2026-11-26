@@ -24,7 +24,8 @@ export class EmailService {
     });
   }
 
-  async sendEmail(to: string, subject: string, html: string): Promise<void> {
+  /** Resolves to false when email is not set up (nothing was sent); throws when sending fails. */
+  async sendEmail(to: string, subject: string, html: string): Promise<boolean> {
     // Resend (preferred when RESEND_API_KEY is set)
     const resendKey = this.config.get<string>('RESEND_API_KEY');
     if (resendKey) {
@@ -38,7 +39,7 @@ export class EmailService {
         throw new Error('Email delivery failed');
       }
       this.logger.log(`Email sent to ${to} via Resend`);
-      return;
+      return true;
     }
 
     if (!this.emailEnabled) {
@@ -51,7 +52,7 @@ export class EmailService {
 ${html.replace(/<[^>]+>/g, ' ')}`,
         );
       }
-      return;
+      return false;
     }
 
     try {
@@ -62,6 +63,7 @@ ${html.replace(/<[^>]+>/g, ' ')}`,
         html,
       });
       this.logger.log(`Email sent to ${to}: ${info.messageId}`);
+      return true;
     } catch (err) {
       this.logger.error(`Failed to send email to ${to}: ${err.message}`);
       throw err;

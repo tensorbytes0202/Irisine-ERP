@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { tenantContext } from '../../prisma/tenant-context';
 import { InvitesService } from '../platform/invites.service';
 import { LimitsService } from '../platform/limits.service';
 
@@ -52,8 +53,8 @@ export class BulkOperationsService {
         }
 
         // Check for duplicate admission number
-        const existingStudent = await this.prisma.student.findUnique({
-          where: { admissionNo: row.admissionNo },
+        const existingStudent = await this.prisma.student.findFirst({
+          where: { admissionNo: row.admissionNo, user: { schoolId } },
         });
         if (existingStudent) {
           errors.push(`${rowLabel}: Admission number already exists`);
@@ -61,9 +62,9 @@ export class BulkOperationsService {
         }
 
         // Check for duplicate email
-        const existingUser = await this.prisma.user.findUnique({
+        const existingUser = await tenantContext.allSchools(() => this.prisma.user.findUnique({
           where: { email: row.email },
-        });
+        }));
         if (existingUser) {
           errors.push(`${rowLabel}: Email already exists`);
           continue;
@@ -170,9 +171,9 @@ export class BulkOperationsService {
           continue;
         }
 
-        const existingReceipt = await this.prisma.payment.findUnique({
+        const existingReceipt = await tenantContext.allSchools(() => this.prisma.payment.findUnique({
           where: { receiptNo: row.receiptNo },
-        });
+        }));
         if (existingReceipt) {
           errors.push(`${rowLabel}: Receipt number "${row.receiptNo}" already exists`);
           continue;
